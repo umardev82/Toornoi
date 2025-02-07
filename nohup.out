@@ -88,3 +88,14 @@ Traceback (most recent call last):
   File "/usr/share/nginx/toornoi/.venv/lib/python3.12/site-packages/django/core/servers/basehttp.py", line 50, in get_internal_wsgi_application
     raise ImproperlyConfigured(
 django.core.exceptions.ImproperlyConfigured: WSGI application 'Toornoi.wsgi.application' could not be loaded; Error importing module.
+/usr/share/nginx/toornoi/core/settings.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+/usr/share/nginx/toornoi/core/settings.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Error: That port is already in use.
