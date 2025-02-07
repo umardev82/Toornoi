@@ -98,7 +98,7 @@ class RegisterUserView(APIView):
             cache.set(token, user.id, timeout=60)
             
             # Construct the verification link
-            verify_link = f"https://toornoi.com.hedu-ai.com/verify-email/?token={token}"
+            verify_link = f"https://toornoi.com/verify-email/?token={token}"
             
             # Send the verification email
             send_mail(
