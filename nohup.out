@@ -99,3 +99,29 @@ System check identified no issues (0 silenced).
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 Error: That port is already in use.
+[07/Feb/2025 20:44:30] "GET / HTTP/1.1" 200 5660
+Not Found: /favicon.ico
+[07/Feb/2025 20:44:31] "GET /favicon.ico HTTP/1.1" 404 8624
+Unauthorized: /loge/register/
+[07/Feb/2025 20:48:06] "POST //loge/register/ HTTP/1.1" 401 27
+Bad Request: /loge/register/
+[07/Feb/2025 20:48:13] "POST //loge/register/ HTTP/1.1" 400 44
+[07/Feb/2025 20:48:29] "POST //loge/register/ HTTP/1.1" 201 57
+Invalid HTTP_HOST header: '15.188.23.39'. You may need to add '15.188.23.39' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/usr/share/nginx/toornoi/.venv/lib/python3.12/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/share/nginx/toornoi/.venv/lib/python3.12/site-packages/django/utils/deprecation.py", line 128, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/share/nginx/toornoi/.venv/lib/python3.12/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/share/nginx/toornoi/.venv/lib/python3.12/site-packages/django/http/request.py", line 151, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '15.188.23.39'. You may need to add '15.188.23.39' to ALLOWED_HOSTS.
+Bad Request: /.env
+[07/Feb/2025 20:53:45] "GET /.env HTTP/1.1" 400 65097
+[07/Feb/2025 20:58:50] "GET / HTTP/1.1" 200 5660
+[07/Feb/2025 20:58:52] "GET / HTTP/1.1" 200 5660
