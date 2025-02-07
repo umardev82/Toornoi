@@ -26,7 +26,9 @@ SECRET_KEY = 'django-insecure-p_9+9!4j1gs@1l43tkhet2g9dx4rdoa5*z2^!x2&*z-o4_mnpp
 DEBUG = True
 
 ALLOWED_HOSTS = ['api.toornoi.com', 'toornoi.com']
-CORS_ALLOWED_ORIGINS = ['toornoi.com']
+
+CORS_ALLOWED_ORIGINS = ['https://toornoi.com']
+
 
 
 # Application definition
