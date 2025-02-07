@@ -1,0 +1,83 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+*.env
+*.venv
+
+# Django-related files
+db.sqlite3
+*.sqlite3
+media/
+staticfiles/
+static/
+*.log
+local_settings.py
+config/settings/local.py
+
+# Secret files
+.env
+*.pem
+*.key
+*.crt
+
+# Migrations
+**/migrations/*.py
+**/migrations/*.pyc
+
+# VS Code settings
+.vscode/
+.settings/
+
+# Python package dependencies
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Pytest & coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+.cache
+nosetests.xml
+pytest_cache/
+junit.xml
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Docker
+docker-compose.override.yml
+*.dockerfile
+*.dockerenv
+
+# Build system
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDEs
+.idea/
+*.iml
+
+# MacOS system files
+.DS_Store
