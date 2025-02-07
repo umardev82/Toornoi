@@ -74,7 +74,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'Toornoi.wsgi.application'
+WSGI_APPLICATION = 'core.wsgi.application'
 
 
 # Database
