@@ -56,7 +56,7 @@ MIDDLEWARE = [
     
 ]
 
-ROOT_URLCONF = 'Toornoi.urls'
+ROOT_URLCONF = 'core.urls'
 
 TEMPLATES = [
     {
