@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  RegisterUserView, SuperAdminLoginView, SuperAdminProfileView, SuperAdminUpdateProfileView, UserLoginView, UserProfileView, UserUpdateProfileView, VerifyEmailView
+from .views import  ForgotPasswordView, RegisterUserView, ResendVerificationEmailView, ResetPasswordView, SuperAdminLoginView, SuperAdminProfileView, SuperAdminUpdateProfileView, UserLoginView, UserProfileView, UserUpdateProfileView, VerifyEmailView
 urlpatterns = [
     path('superadmin/login/', SuperAdminLoginView.as_view(), name='superadmin-login'),
     path('superadmin/profile/', SuperAdminProfileView.as_view(), name='superadmin-profile'),  # Fetch profile
@@ -7,7 +7,10 @@ urlpatterns = [
      #Register user
     path('register/', RegisterUserView.as_view(), name='register'),
     path('verify-email/', VerifyEmailView.as_view(), name='verify-email'),
+    path('resend-verification-email/', ResendVerificationEmailView.as_view(), name='resend-verification-email'),
     path('login/', UserLoginView.as_view(), name='user-login'),
+    path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
+    path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('user/profile/', UserProfileView.as_view(), name='user-profile'),  # Fetch profile
     path('user/profile/update/', UserUpdateProfileView.as_view(), name='user-update-profile'), 
 ]

@@ -63,15 +63,24 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 #user Registrations 
-
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
+    confirm_password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'date_of_birth', 'phone_number',  'password']
+        fields = ['username', 'email', 'date_of_birth', 'phone_number', 'password', 'confirm_password']
+
+    def validate(self, attrs):
+        # Check if passwords match
+        if attrs['password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"password": "Password and Confirm Password are not  match."})
+        return attrs
 
     def create(self, validated_data):
+        # Remove confirm_password as it's not needed for user creation
+        validated_data.pop('confirm_password')
+        
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
@@ -120,5 +129,25 @@ class UserLoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
 
-    
+ 
+ 
+# Forgot Password Serializer
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("User with this email does not exist.")
+        return value
+
+
+# Reset Password Serializer
+class ResetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"new_password": "Passwords do not match."})
+        return attrs    
     

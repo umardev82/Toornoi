@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from .serializers import LoginSerializer, UserLoginSerializer, UserRegistrationSerializer
+from .serializers import ForgotPasswordSerializer, LoginSerializer, ResetPasswordSerializer, UserLoginSerializer, UserRegistrationSerializer
 from .serializers import UserProfileSerializer
 from django.contrib.auth.models import User
 from django.core.cache import cache  # or use a database to store tokens
@@ -73,19 +73,7 @@ class SuperAdminUpdateProfileView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
-# for user
-# class RegisterUserView(APIView):
-#     def post(self, request):
-#         serializer = UserRegistrationSerializer(data=request.data)
-#         if serializer.is_valid():
-#             user = serializer.save()
-#             token = uuid.uuid4().hex
-#             cache.set(token, user.id, timeout=86400)
-#             print(f"Generated token: {token}, User ID: {user.id}")
-#             return Response({"message": "Check your email for the verification link."}, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+# for user  Register
 from django.core.mail import send_mail
 from django.urls import reverse
 
@@ -93,10 +81,20 @@ class RegisterUserView(APIView):
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
+            email = serializer.validated_data['email']
+            # Check if the user is already registered but not verified
+            user = User.objects.filter(email=email, is_active=False).first()
+            if user:
+                return Response(
+                    {"message": "User already registered but not verified. Redirecting to resend email."},
+                    status=status.HTTP_302_FOUND
+                )
+
+            # Save the new user
             user = serializer.save()
             token = uuid.uuid4().hex
-            cache.set(token, user.id, timeout=60)
-            
+            cache.set(token, user.id, timeout=3600)
+
             # Construct the verification link
             verify_link = f"https://toornoi.com/verify-email/?token={token}"
             
@@ -104,7 +102,7 @@ class RegisterUserView(APIView):
             send_mail(
                 'Verify Your Account',
                 f'Click the link to verify your account: {verify_link}',
-                'chumarlatif123@gmail.com',
+                'chumarlatif123@gmail.com',  
                 [user.email],
                 fail_silently=False,
             )
@@ -127,10 +125,10 @@ class VerifyEmailView(APIView):
 
         # Get the user ID from the cache using the token
         user_id = cache.get(token)
-        
         if not user_id:
-            return Response({"error": "Invalid or expired token. Please request a new verification email."},
-                             status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "error": "Invalid or expired token. Please request a new verification email."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # Find the user and mark them as active and verified
@@ -145,6 +143,40 @@ class VerifyEmailView(APIView):
             return Response({"message": "Your account has been verified."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Resend Email verification 
+
+class ResendVerificationEmailView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email, is_active=False)
+
+            # Generate a new token
+            token = uuid.uuid4().hex
+            cache.set(token, user.id, timeout=3600)
+
+            # Construct the verification link
+            verify_link = f"https://toornoi.com/verify-email/?token={token}"
+            
+            # Send the verification email
+            send_mail(
+                'Verify Your Account - Resend',
+                f'Click the link to verify your account: {verify_link}',
+                 'chumarlatif123@gmail.com',
+                [user.email],
+                fail_silently=False,
+            )
+
+            return Response({"message": "Verification email has been resent."}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found or already verified"}, status=status.HTTP_404_NOT_FOUND)
+
 
 
 
@@ -207,3 +239,56 @@ class UserUpdateProfileView(APIView):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
+            
+            
+            
+# Forgot Password View
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            user = User.objects.get(email=email)
+            token = uuid.uuid4().hex
+            cache.set(token, user.id, timeout=3600)  # Token expires in 1 hour
+
+            # Construct the reset password link
+            reset_link = f"https://toornoi.com/reset-password/?token={token}"
+            
+            # Send the reset password email
+            send_mail(
+                'Reset Your Password',
+                f'Click the link to reset your password: {reset_link}',
+                'chumarlatif123@gmail.com',  # Change to your sender email
+                [user.email],
+                fail_silently=False,
+            )
+
+            return Response({"message": "A password reset link has been sent to your email."}, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Reset Password View
+class ResetPasswordView(APIView):
+    def post(self, request):
+        token = request.GET.get('token')
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user_id = cache.get(token)
+        if not user_id:
+            return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ResetPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                user = User.objects.get(id=user_id)
+                user.set_password(serializer.validated_data['new_password'])
+                user.save()
+                cache.delete(token)  # Clean up the token
+                return Response({"message": "Your password has been reset successfully."}, status=status.HTTP_200_OK)
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)            
