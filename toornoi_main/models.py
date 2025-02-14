@@ -14,7 +14,7 @@ class Tournament(models.Model):
     category = models.CharField(max_length=255,null=True, blank=True)
     registration_deadline = models.DateTimeField(null=True, blank=True)
     registration_fee = models.CharField(max_length=100,blank=True,null=True)
-    sumup_link = models.URLField(max_length=500, null=True, blank=True) 
+    # sumup_link = models.URLField(max_length=500, null=True, blank=True) 
     slots = models.IntegerField(null=True, blank=True)
     status = models.CharField(max_length=255, default='Pending')
     start_date = models.DateField(null=True, blank=True)
