@@ -1,20 +1,45 @@
 
 from rest_framework import viewsets,permissions
+from toornoi_user_management.models import User
 from .models import Stage, Tournament,Match,TournamentRegistration
-from .serializers import DisplayMatchSerializer, DisplayStageSerializer, StageSerializer, TournamentSerializer,MatchSerializer
+from .serializers import DisplayMatchSerializer, DisplayStageSerializer, StageSerializer, TournamentSerializer,MatchSerializer,AthletesSerializer
 import stripe
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.conf import settings
-
+from django.shortcuts import get_object_or_404
 # for admin panel 
 class Tournamentviewset(viewsets.ModelViewSet):
-    """
-    A ViewSet for viewing and editing tournament instances.
-    """
     queryset=Tournament.objects.all()
     serializer_class=TournamentSerializer
 
+
+# For admin panel Athletes management
+class AthleteViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.exclude(id=1)  # Exclude the first user by ID
+    serializer_class = AthletesSerializer
+    
+    
+ # For admin panel show  total number of  Athletes    
+class AthletesViewSet(viewsets.ViewSet):
+    def list(self, request):
+        # Exclude the first user by ID and count the rest
+        total_users = User.objects.exclude(id=1).count()
+        
+        # Return the total number of users as a response
+        return Response({"total_users": total_users})   
+    
+    
+ # For admin panel show  total number of  Athletes    
+class TournamentAllViewSet(viewsets.ViewSet):
+    def list(self, request):
+        # Exclude the first user by ID and count the rest
+        total_tournaments = Tournament.objects.all().count()
+        
+        # Return the total number of users as a response
+        return Response({"total_tournaments": total_tournaments})   
+    
+         
 
 class MatchViewSet(viewsets.ModelViewSet):
     queryset = Match.objects.all()
@@ -41,91 +66,32 @@ class StageViewSet(viewsets.ModelViewSet):
     
 
 # user tournament show and register for user
-
-
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-class TournamentsViewSet(viewsets.ReadOnlyModelViewSet):  # Use ReadOnlyModelViewSet to disable create/update/delete
+class TournamentsViewSet(viewsets.ReadOnlyModelViewSet):  
     queryset = Tournament.objects.all()
     serializer_class = TournamentSerializer
     permission_classes = [permissions.AllowAny]
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def register(self, request, pk=None):
-        try:
-            tournament = self.get_object()
-            user = request.user
+        tournament = get_object_or_404(Tournament, pk=pk)
+        user = request.user
 
-            # Check if user is already registered
-            if TournamentRegistration.objects.filter(user=user, tournament=tournament).exists():
-                return Response({"error": "You are already registered for this tournament."}, status=400)
+        # Check if user is already registered
+        if TournamentRegistration.objects.filter(user=user, tournament=tournament).exists():
+            return Response({"error": "You are already registered for this tournament."}, status=400)
 
-            # Create Stripe payment intent
-            
-            amount = int(tournament.registration_fee * 100)  # Convert to cents
-            intent = stripe.PaymentIntent.create(
-            amount=amount,
-            currency="usd",  # Change to your currency
-            customer=user.stripe_customer_id if hasattr(user, 'stripe_customer_id') else None,
-            payment_method=request.data.get("payment_method_id"),
-            confirm=True,
-            automatic_payment_methods={
-                "enabled": True,
-                "allow_redirects": "never",  # Optionally disable redirects
-            },
-            metadata={"tournament_id": tournament.id, "user_id": user.id}
-            )
-
-
-            # Register user in the tournament with "Pending" payment status
-            registration = TournamentRegistration.objects.create(
-                user=user,
-                tournament=tournament,
-                stripe_payment_intent_id=intent.id,
-                payment_status="Pending"
-            )
-
-            return Response({
-                "message": "Tournament registration initiated.",
-                "payment_intent_id": intent.id,
-                "client_secret": intent.client_secret
-            }, status=201)
-
-        except Tournament.DoesNotExist:
-            return Response({"error": "Tournament not found."}, status=404)
-
-import stripe
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
-from .models import TournamentRegistration  # Adjust the import if necessary
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
-
-@csrf_exempt
-def stripe_webhook(request):
-    payload = request.body.decode('utf-8')
-    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
-    event = None
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_ENDPOINT_SECRET
+        # Create a registration record with Pending status
+        registration = TournamentRegistration.objects.create(
+            user=user,
+            tournament=tournament,
+            payment_status="Pending"
         )
-    except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-    except stripe.error.SignatureVerificationError as e:
-        return JsonResponse({'error': 'Webhook signature verification failed.'}, status=400)
 
-    # Handle the event
-    if event['type'] == 'payment_intent.succeeded':
-        payment_intent = event['data']['object']
-        # Payment was successful, update registration status
-        registration = TournamentRegistration.objects.get(
-            stripe_payment_intent_id=payment_intent['id']
-        )
-        registration.payment_status = 'Paid'
-        registration.save()
+        # Return the SumUp payment link
+        return Response({
+            "message": "Registration successful. Proceed to payment.",
+            "sumup_link": tournament.sumup_link
+        }, status=201)
 
-    return JsonResponse({'status': 'success'}, status=200)
+
+          

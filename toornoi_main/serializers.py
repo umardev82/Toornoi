@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from toornoi_user_management.models import User
 from .models import Stage, Tournament,Match, TournamentRegistration
 
 
@@ -62,3 +63,10 @@ class DisplayStageSerializer(serializers.ModelSerializer):
         model = Stage
         fields = '__all__'
 
+
+#for admin  show all athletes and admin will have that ption to delete or manage any athlete profile….
+
+class AthletesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id','username','first_name','last_name','date_of_birth','email','password','phone_number','is_verified','is_active']

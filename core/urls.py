@@ -19,13 +19,16 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from  toornoi_main.views import MatchViewSet, StageViewSet, TournamentsViewSet, Tournamentviewset, stripe_webhook
+from  toornoi_main.views import AthletesViewSet, MatchViewSet, StageViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet
 
 
 
 router = DefaultRouter()
 # for admin panel 
 router.register('tournaments', Tournamentviewset, basename='tournament')
+router.register('users',AthleteViewSet,basename='users')
+router.register('total_user',AthletesViewSet,basename='all_users')
+router.register('total_tournaments', TournamentAllViewSet, basename='all_tournament')
 router.register('matches', MatchViewSet,basename='matches')
 router.register('stages', StageViewSet, basename='stage')
 
@@ -38,7 +41,6 @@ router.register('tournament_user', TournamentsViewSet, basename='tournament_user
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('loge/', include('toornoi_user_management.urls')),
-    path('webhook/', stripe_webhook, name='stripe-webhook'),
     path('', include(router.urls)),
     
 ]
