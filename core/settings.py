@@ -90,8 +90,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'Toornoi_management',
         'USER':'root',
-          'PASSWORD':'',
-        # 'PASSWORD':'Pak@123',
+        'PASSWORD':'Pak@123',
         'HOST':'127.0.0.1',
         'PORT':'3306',
     }
