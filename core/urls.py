@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from  toornoi_main.views import AthletesViewSet, MatchViewSet, StageViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet
+from  toornoi_main.views import AthletesViewSet, MatchViewSet, StageViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet
 
 
 
@@ -30,6 +30,7 @@ router.register('users',AthleteViewSet,basename='users')
 router.register('total_user',AthletesViewSet,basename='all_users')
 router.register('total_tournaments', TournamentAllViewSet, basename='all_tournament')
 router.register('matches', MatchViewSet,basename='matches')
+router.register('register_athletes_tournament',RegisterAthletesShowViewSet,basename='registerAthletesTournament')
 router.register('stages', StageViewSet, basename='stage')
 
 #for user  show tournament list and resgister on it 
@@ -41,6 +42,7 @@ router.register('tournament_user', TournamentsViewSet, basename='tournament_user
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('loge/', include('toornoi_user_management.urls')),
+    path('user/matches/', UserMatchesViewSet.as_view({'get': 'my_matches'}), name='user-matches'),
     path('', include(router.urls)),
     
 ]

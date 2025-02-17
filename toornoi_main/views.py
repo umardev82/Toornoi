@@ -2,7 +2,7 @@
 from rest_framework import viewsets,permissions
 from toornoi_user_management.models import User
 from .models import Stage, Tournament,Match,TournamentRegistration
-from .serializers import DisplayMatchSerializer, DisplayStageSerializer, StageSerializer, TournamentSerializer,MatchSerializer,AthletesSerializer
+from .serializers import DisplayMatchSerializer, DisplayStageSerializer, StageSerializer, TournamentRegistrationSerializer, TournamentSerializer,MatchSerializer,AthletesSerializer
 import stripe
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -16,7 +16,7 @@ class Tournamentviewset(viewsets.ModelViewSet):
 
 # For admin panel Athletes management
 class AthleteViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.exclude(id=1)  # Exclude the first user by ID
+    queryset = User.objects.exclude(is_superuser=1)  # Exclude the first user by ID
     serializer_class = AthletesSerializer
     
     
@@ -24,7 +24,7 @@ class AthleteViewSet(viewsets.ModelViewSet):
 class AthletesViewSet(viewsets.ViewSet):
     def list(self, request):
         # Exclude the first user by ID and count the rest
-        total_users = User.objects.exclude(id=1).count()
+        total_users = User.objects.exclude(is_superuser=1).count()
         
         # Return the total number of users as a response
         return Response({"total_users": total_users})   
@@ -39,7 +39,13 @@ class TournamentAllViewSet(viewsets.ViewSet):
         # Return the total number of users as a response
         return Response({"total_tournaments": total_tournaments})   
     
-         
+# For admin panel to show and update Registered Athletes 
+class RegisterAthletesShowViewSet(viewsets.ModelViewSet):
+    queryset = TournamentRegistration.objects.all()
+    serializer_class = TournamentRegistrationSerializer
+  
+     
+     
 
 class MatchViewSet(viewsets.ModelViewSet):
     queryset = Match.objects.all()
@@ -53,6 +59,23 @@ class MatchViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Any custom logic during creation (you can add extra logic here if needed)
         serializer.save()
+ 
+ 
+class UserMatchesViewSet(viewsets.ViewSet):
+    # permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def my_matches(self, request):
+        user = request.user
+        
+        # Get tournaments where the user is registered
+        registered_tournaments = TournamentRegistration.objects.filter(user=user).values_list('tournament', flat=True)
+        
+        # Get matches for those tournaments
+        matches = Match.objects.filter(tournament__id__in=registered_tournaments)
+        
+        serializer = MatchSerializer(matches, many=True)
+        return Response(serializer.data) 
         
         
 class StageViewSet(viewsets.ModelViewSet):

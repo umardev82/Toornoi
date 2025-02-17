@@ -10,10 +10,24 @@ class TournamentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 # for admin panel 
+
+# class TournamentRegistrationSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = TournamentRegistration
+#         fields = '__all__'
 class TournamentRegistrationSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    tournament_name = serializers.SerializerMethodField()
+
     class Meta:
         model = TournamentRegistration
-        fields = '__all__'
+        fields = ['id', 'payment_status', 'registered_at', 'username', 'tournament_name']
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_tournament_name(self, obj):
+        return obj.tournament.tournament_name
 
 
  #for admin panel  create match 
@@ -70,3 +84,13 @@ class AthletesSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id','username','first_name','last_name','date_of_birth','email','password','phone_number','is_verified','is_active']
+        
+        
+        
+class MatchUserSerializer(serializers.ModelSerializer):
+    tournament = serializers.CharField(source='tournament.tournament_name', read_only=True)
+
+    class Meta:
+        model = Match
+        fields = ['id', 'tournament', 'team1', 'team2', 'winner','result','date', 'status']
+        
