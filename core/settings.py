@@ -88,7 +88,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Toornoi_management',
+        'NAME': 'Toornoi_manage',
         'USER':'root',
         'PASSWORD':'Pak@123',
         'HOST':'127.0.0.1',
@@ -164,4 +164,12 @@ REST_FRAMEWORK = {
     ],
 }
 
-STRIPE_SECRET_KEY=''
+
+
+STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
+STRIPE_ENDPOINT_SECRET = "https://api.toornoi.com/webhook/"
+# STRIPE_ENDPOINT_SECRET = "whsec_c3a828789646f231d69716991c5e2a2d8dd67759aa3d39360decb62a1d2f41fa"
+
+
+
+

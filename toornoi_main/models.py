@@ -45,13 +45,24 @@ class Tournament(models.Model):
 User = get_user_model()
 
 class TournamentRegistration(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE)
-    payment_status = models.CharField(max_length=20, choices=[('Pending', 'Pending'), ('Paid', 'Paid')], default='Pending')
-    registered_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    PAYMENT_STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Paid", "Paid"),
+        ("Failed", "Failed"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE,related_name="registrations",null=True, blank=True)
+    stripe_payment_intent_id = models.CharField(max_length=255, null=True, blank=True)
+    amount = models.CharField(max_length=255, null=True, blank=True)
+    payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default="Pending")
+    created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'tournament')
 
     def __str__(self):
-        return f"{self.user.username} registered for {self.tournament.tournament_name}"
+        return f"{self.user.username} - {self.tournament.name}"
     
     
     

@@ -4,10 +4,14 @@ from .models import Stage, Tournament,Match, TournamentRegistration
 
 
 # for admin panel 
+
+
 class TournamentSerializer(serializers.ModelSerializer):
     class Meta:
-        model=Tournament
-        fields = '__all__'
+        model = Tournament
+        fields = '__all__'  # Include all tournament fields
+
+
 
 # for admin panel 
 
@@ -21,7 +25,8 @@ class TournamentRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TournamentRegistration
-        fields = ['id', 'payment_status', 'registered_at', 'username', 'tournament_name']
+        fields= '__all__'
+        # fields = ['id', 'payment_status', 'registered_at', 'username', 'tournament_name']
 
     def get_username(self, obj):
         return obj.user.username
@@ -87,10 +92,4 @@ class AthletesSerializer(serializers.ModelSerializer):
         
         
         
-class MatchUserSerializer(serializers.ModelSerializer):
-    tournament = serializers.CharField(source='tournament.tournament_name', read_only=True)
 
-    class Meta:
-        model = Match
-        fields = ['id', 'tournament', 'team1', 'team2', 'winner','result','date', 'status']
-        
