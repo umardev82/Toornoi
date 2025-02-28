@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from  toornoi_main.views import AthletesViewSet, MatchViewSet, StageViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentsViewSet, stripe_webhook
+from  toornoi_main.views import AthletesViewSet, ClaimViewSet, MatchChatViewSet, MatchViewSet, PoolViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentsViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
 
 
 
@@ -31,24 +31,67 @@ router.register('tournaments', Tournamentviewset, basename='tournament')
 router.register('users',AthleteViewSet,basename='users')
 router.register('total_user',AthletesViewSet,basename='all_users')
 router.register('total_tournaments', TournamentAllViewSet, basename='all_tournament')
+
+  #  if you wnat to get total actiave matches  http://127.0.0.1:8000/matches/pending-count/ 
+#   this url  for full crude control for admin on matches  http://127.0.0.1:8000/matches/
 router.register('matches', MatchViewSet,basename='matches')
 router.register('register_athletes_tournament',RegisterAthletesShowViewSet,basename='registerAthletesTournament')
-router.register('stages', StageViewSet, basename='stage')
+
 #  Fetch tournaments where the user is registered   /my_tournaments/my_tournaments/
 router.register('my_tournaments', UserTournamentsViewSet, basename='my_tournaments')
 
 
+#Get mathod  http://127.0.0.1:8000/user/matches/my_matches/ for my matches
+# Post mathod  http://127.0.0.1:8000/user/matches/3/update_match_result/
+# Example {
+#     "score": "80"
+# }
+router.register('user/matches', UserMatchesViewSet, basename='user-matches')
+router.register('pools', PoolViewSet, basename='pool')
+
 #for user  show tournament list and resgister on it 
 router.register('tournament_user', TournamentsViewSet, basename='tournament_user')
 
+# in user profile list  matches Achievements win ,lose and pending matches 
+router.register('profile-matches', UsersMatchesViewSet, basename='profile-matches')
 
+router.register('claims', ClaimViewSet, basename='claims')
+router.register('total_claim',TotalclaimViewSet,basename='total_claim')
+
+
+    # For nested MatchChat endpoints, we define separate views.
+match_chat_list = MatchChatViewSet.as_view({
+    'get': 'list',
+    'post': 'create'
+})
+match_chat_detail = MatchChatViewSet.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy'
+})
+    
 
 
 urlpatterns = [
+# GET /matches/<match_pk>/chats/: Retrieves the conversation (i.e., all chat messages) for the specified match.
+# POST /matches/<match_pk>/chats/: Allows an authenticated user (one of the two players) to
+    path('matches/<int:match_pk>/chats/', match_chat_list, name='match-chat-list'),
+    
+    # update ,DELETE http://127.0.0.1:8000/matches/2/chats/5/
+    path('matches/<int:match_pk>/chats/<int:pk>/', match_chat_detail, name='match-chat-detail'),
+    
+    
     path('admin/', admin.site.urls),
     path('loge/', include('toornoi_user_management.urls')),
-    path('user/matches/', UserMatchesViewSet.as_view({'get': 'my_matches'}), name='user-matches'),   
-
+       
+# calculates and returns the total amount from the
+# TournamentRegistration model for all registrations whose payment_status is "paid." 
+    path('total-paid-amount/', total_paid_amount, name='total-paid-amount'),
+    
+    
+    # calculates the total sum of three fields—positions_1, positions_2, and positions_3—from your Tournament model.
+    path('total-positions/', total_positions, name='total-positions'),
     path('webhook/', stripe_webhook, name='stripe-webhook'),
     path('', include(router.urls)),
     

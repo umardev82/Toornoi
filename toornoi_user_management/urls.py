@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import  ForgotPasswordView, RegisterUserView, ResendVerificationEmailView, ResetPasswordView, SuperAdminLoginView, SuperAdminProfileView, SuperAdminUpdateProfileView, UserLoginView, UserProfileView, UserUpdateProfileView, VerifyEmailView
+from rest_framework_simplejwt.views import TokenRefreshView
+from .views import  ForgotPasswordView, RegisterUserView, ResendVerificationEmailView, ResetPasswordView, SuperAdminLoginView, SuperAdminProfileView, SuperAdminUpdateProfileView, UserLoginView, UserProfileView, UserUpdateProfileView, VerifyEmailView, googleAuthentication
 urlpatterns = [
     path('superadmin/login/', SuperAdminLoginView.as_view(), name='superadmin-login'),
     path('superadmin/profile/', SuperAdminProfileView.as_view(), name='superadmin-profile'),  # Fetch profile
@@ -13,4 +14,8 @@ urlpatterns = [
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('user/profile/', UserProfileView.as_view(), name='user-profile'),  # Fetch profile
     path('user/profile/update/', UserUpdateProfileView.as_view(), name='user-update-profile'), 
+    
+    
+    path('google/', googleAuthentication.as_view(), name='googleAuthentication'),
+    path("refresh_token/", TokenRefreshView.as_view())
 ]

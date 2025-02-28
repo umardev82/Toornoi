@@ -6,6 +6,7 @@ from decimal import Decimal
 
 # for admin panel 
 
+    
 class Tournament(models.Model):
     
     tournament_name = models.CharField(max_length=255)
@@ -14,7 +15,6 @@ class Tournament(models.Model):
     category = models.CharField(max_length=255,null=True, blank=True)
     registration_deadline = models.DateTimeField(null=True, blank=True)
     registration_fee = models.CharField(max_length=100,blank=True,null=True)
-    sumup_link = models.URLField(max_length=500, null=True, blank=True) 
     slots = models.IntegerField(null=True, blank=True)
     status = models.CharField(max_length=255, default='Pending')
     start_date = models.DateField(null=True, blank=True)
@@ -35,6 +35,7 @@ class Tournament(models.Model):
     positions_3 = models.TextField(null=True, blank=True)
     sponsorship_details = models.TextField(null=True, blank=True)
     sponsor_logos = models.ImageField(upload_to='tournaments/sponsors_logo/', null=True, blank=True)
+
     partnership_info = models.TextField(null=True, blank=True)
     refund_policy = models.TextField(null=True, blank=True)
 
@@ -67,8 +68,21 @@ class TournamentRegistration(models.Model):
     
     
     
+
+class Pool(models.Model):
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='pools')
+    pool_number = models.IntegerField()  # e.g., 1 for Pool 1, 2 for Pool 2, etc.
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
     
+    result = models.JSONField(default=dict, blank=True)  # Added field for storing extra pool data (e.g., bye athletes)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Pool {self.pool_number} for {self.tournament}" 
+        
     #mathch model 
+    User = get_user_model()
 class Match(models.Model):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
@@ -78,25 +92,42 @@ class Match(models.Model):
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='matches')
     player_1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='player_1_matches')
     player_2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='player_2_matches')
-    stage = models.IntegerField()
+    pool = models.ForeignKey(Pool, on_delete=models.CASCADE, related_name='matches', null=True, blank=True)
     date = models.DateTimeField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
-    result = models.JSONField(null=True, blank=True)
+    result = models.JSONField(default=dict, blank=True)
     winner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='won_matches')
-    screenshot = models.ImageField(upload_to='match_screenshots/', null=True, blank=True)
+    
+   
+   
+    def __str__(self):
+        return f"Match {self.id} in {self.tournament}"
+    
+    
+    
+    
+
+User = get_user_model()
+
+class Claim(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='claims')
+    phone_number = models.CharField(max_length=20)
+    subject = models.CharField(max_length=255)
+    details = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Match: {self.player_1} vs {self.player_2} - Stage {self.stage}"
+        return f"Claim {self.id} by {self.user.username}: {self.subject}"    
     
     
     
-#stage model  for admin
-class Stage(models.Model):
-    tournament = models.ForeignKey('Tournament', on_delete=models.CASCADE, related_name='stages')
-    stage_number = models.IntegerField()
-    number_of_matches = models.IntegerField()
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField()
+# New model: Chat messages for a match
+class MatchChat(models.Model):
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='chats')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Stage {self.stage_number} - {self.tournament.name}"    
+        return f"Chat by {self.sender.username} in Match {self.match.id}"    
+   

@@ -45,7 +45,9 @@ INSTALLED_APPS = [
     'toornoi_main',
     'rest_framework',
      'rest_framework.authtoken',
+     'rest_framework_simplejwt',
      'corsheaders'
+     
    
 ]
 
@@ -90,6 +92,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'Toornoi_manage',
         'USER':'root',
+        # 'PASSWORD':'',
         'PASSWORD':'Pak@123',
         'HOST':'127.0.0.1',
         'PORT':'3306',
@@ -146,6 +149,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 import os
 # Email settings
+# Email settings for SendGrid
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.sendgrid.net'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'apikey'  # This must literally be 'apikey'
+# EMAIL_HOST_PASSWORD = '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'  # Replace with your SendGrid API key
+
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
@@ -167,9 +179,20 @@ REST_FRAMEWORK = {
 
 
 STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
-STRIPE_ENDPOINT_SECRET = "https://api.toornoi.com/webhook/"
+
+STRIPE_ENDPOINT_SECRET = "whsec_EP07U9DJ3Nr1AjSKqY9EPvC0nlOqWmVH"
 # STRIPE_ENDPOINT_SECRET = "whsec_c3a828789646f231d69716991c5e2a2d8dd67759aa3d39360decb62a1d2f41fa"
 
 
+# whsec_EP07U9DJ3Nr1AjSKqY9EPvC0nlOqWmVH
+APPEND_SLASH = False
 
-
+# client_id="10715750182-nuvct2g4a67etm0eh6ohfc4h5en56msr.apps.googleusercontent.com"
+# client_secret="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"
+              
+# AIzaSyAPCori2nzi9LECo_qjiWATF8mnhSmcf2c
+# REST_FRAMEWORK={
+#     'DEFAULT_AUTHENTICATION_CLASSES':(
+#         'rest_framework_simplejwt.authentication.JWTAuthentication'
+#     ),
+# }
