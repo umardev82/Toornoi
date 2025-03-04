@@ -25,10 +25,10 @@ SECRET_KEY = 'django-insecure-p_9+9!4j1gs@1l43tkhet2g9dx4rdoa5*z2^!x2&*z-o4_mnpp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# ALLOWED_HOSTS = ['api.toornoi.com', 'toornoi.com']
-ALLOWED_HOSTS = []
-# CORS_ALLOWED_ORIGINS = ['https://toornoi.com']
-CORS_ALLOW_ALL_ORIGINS = True
+ALLOWED_HOSTS = ['api.toornoi.com', 'toornoi.com']
+# ALLOWED_HOSTS = []
+CORS_ALLOWED_ORIGINS = ['https://toornoi.com']
+# CORS_ALLOW_ALL_ORIGINS = True
 
 
 
@@ -90,10 +90,10 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Toornoi_management',
+        'NAME': 'Toornoi_manage',
         'USER':'root',
-        'PASSWORD':'',
-        # 'PASSWORD':'Pak@123',
+        # 'PASSWORD':'',
+        'PASSWORD':'Pak@123',
         'HOST':'127.0.0.1',
         'PORT':'3306',
     }
@@ -178,21 +178,14 @@ REST_FRAMEWORK = {
 
 
 
-STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
+STRIPE_SECRET_KEY = ""
 
 STRIPE_ENDPOINT_SECRET = ""
                         #   whsec_mhHKaDI0oNZdYD1zjftzPHBaolYrAA9p
-# STRIPE_ENDPOINT_SECRET = "whsec_c3a828789646f231d69716991c5e2a2d8dd67759aa3d39360decb62a1d2f41fa"
+
 
 
 # whsec_EP07U9DJ3Nr1AjSKqY9EPvC0nlOqWmVH
 APPEND_SLASH = False
 
-client_id="10715750182-nuvct2g4a67etm0eh6ohfc4h5en56msr.apps.googleusercontent.com"
-client_secret="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"
-# AIzaSyAPCori2nzi9LECo_qjiWATF8mnhSmcf2c
-# REST_FRAMEWORK={
-#     'DEFAULT_AUTHENTICATION_CLASSES':(
-#         'rest_framework_simplejwt.authentication.JWTAuthentication'
-#     ),
-# }
+
