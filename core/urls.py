@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from  toornoi_main.views import AthletesViewSet, ClaimViewSet, MatchChatViewSet, MatchViewSet, PoolViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentsViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
+from  toornoi_main.views import AthletesViewSet, ClaimViewSet, MatchChatViewSet, MatchViewSet, PoolViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentCountView, UserTournamentResultsView, UserTournamentsViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
 
 
 
@@ -54,10 +54,13 @@ router.register('tournament_user', TournamentsViewSet, basename='tournament_user
 
 # in user profile list  matches Achievements win ,lose and pending matches 
 router.register('profile-matches', UsersMatchesViewSet, basename='profile-matches')
+#  total number of tournaments a user has participated  in user profile list
+# http://127.0.0.1:8000/api/user/tournaments/count/
 
 router.register('claims', ClaimViewSet, basename='claims')
 router.register('total_claim',TotalclaimViewSet,basename='total_claim')
 
+# path('user/tournaments/count/', UserTournamentCountView.as_view(), name='user-tournament-count'),
 
     # For nested MatchChat endpoints, we define separate views.
 match_chat_list = MatchChatViewSet.as_view({
@@ -84,12 +87,15 @@ urlpatterns = [
     
     path('admin/', admin.site.urls),
     path('loge/', include('toornoi_user_management.urls')),
+     path('api/', include('toornoi_main.urls')),
        
 # calculates and returns the total amount from the
 # TournamentRegistration model for all registrations whose payment_status is "paid." 
     path('total-paid-amount/', total_paid_amount, name='total-paid-amount'),
     
-    
+    # the total number of tournaments the authenticated user has total won and total lost and total_prize
+     path('user/tournaments/results/', UserTournamentResultsView.as_view(), name='user-tournament-results'),
+     
     # calculates the total sum of three fields—positions_1, positions_2, and positions_3—from your Tournament model.
     path('total-positions/', total_positions, name='total-positions'),
     path('webhook/', stripe_webhook, name='stripe-webhook'),

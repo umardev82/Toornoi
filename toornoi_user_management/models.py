@@ -20,7 +20,7 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=15, unique=True)  # Phone number
     photo=models.FileField(blank=True, null=True) 
     location=models.CharField(max_length=250,null=True, blank=True)
-    google_user_id = models.CharField(max_length=255, unique=True,null=True, blank=True)  
+   
 
     
     objects = UserManager()

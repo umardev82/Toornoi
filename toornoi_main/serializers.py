@@ -41,10 +41,7 @@ class GetTournamentSerializer(serializers.ModelSerializer):
 
 # for admin panel 
 
-# class TournamentRegistrationSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = TournamentRegistration
-#         fields = '__all__'
+
 class TournamentRegistrationSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     tournament_name = serializers.SerializerMethodField()
@@ -62,6 +59,57 @@ class TournamentRegistrationSerializer(serializers.ModelSerializer):
 
 
 
+User = get_user_model()
+
+class DisplayPoolSerializer(serializers.ModelSerializer):
+    
+    winner_players = serializers.SerializerMethodField()
+    loser_players = serializers.SerializerMethodField()
+    tournament = serializers.StringRelatedField()  # Display the tournament name
+
+    class Meta:
+        model = Pool
+        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants','winner_players','loser_players'] 
+           
+    def get_winner_players(self, obj):
+        """
+        Returns a list of usernames for players who won their matches in this pool.
+        Only matches with status "Completed" and a non-null winner are considered.
+        """
+        winners = []
+        matches = obj.matches.filter(status="Completed")
+        for match in matches:
+            if match.winner:
+                winners.append(match.winner.username)
+        return winners
+
+    def get_loser_players(self, obj):
+        """
+        Returns a list of usernames for players who lost their matches in this pool.
+        For each completed match, the loser is the player who is not the winner.
+        """
+        losers = []
+        matches = obj.matches.filter(status="Completed")
+        for match in matches:
+            if match.winner:
+                # Determine the loser: if player_1 is the winner, then player_2 lost, and vice versa.
+                if match.winner == match.player_1:
+                    losers.append(match.player_2.username)
+                else:
+                    losers.append(match.player_1.username)
+        return losers
+
+        
+class PoolSerializer(serializers.ModelSerializer):
+    # This field is read-only and can be used to display the total number of athletes/winners for the pool.
+    # total_participants = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Pool
+        # fields='__all__'
+        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants']
+
+
 #update code  start
 # Create a nested serializer for Tournament to include the extra fields.
 class TournamentNestedSerializer(serializers.ModelSerializer):
@@ -76,19 +124,20 @@ class TournamentNestedSerializer(serializers.ModelSerializer):
             'rules_and_regulations',
             'country',
             'bracket_type',
-        )
-     
+        )  
+        
+        
  #for admin panel  create match 
 User = get_user_model()
 
 class DisplayMatchSerializer(serializers.ModelSerializer):
     tournament = TournamentNestedSerializer()  # Use the nested serializer
-    # tournament = serializers.StringRelatedField()  # Display the tournament name
     player_1 = serializers.CharField(source='player_1.username')  # Display player 1's username
     player_2 = serializers.CharField(source='player_2.username')  # Display player 2's username
     player_1_photo = serializers.SerializerMethodField()
     player_2_photo = serializers.SerializerMethodField()
     admin_username = serializers.SerializerMethodField()
+    pool = serializers.IntegerField(source='pool.pool_number', read_only=True)
     winner = serializers.CharField(source='winner.username', allow_null=True)  # Display winner's username
     result = serializers.JSONField()  # Display the JSON result as is
 
@@ -178,21 +227,6 @@ class MatchSerializer(serializers.ModelSerializer):
 
 
 
-class DisplayPoolSerializer(serializers.ModelSerializer):
-     # This field is read-only and can be used to display the total number of athletes/winners for the pool.
-    total_participants = serializers.IntegerField(read_only=True)
-    tournament = serializers.StringRelatedField()  # Display the tournament name
-    class Meta:
-        model = Pool
-        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants']
-        
-class PoolSerializer(serializers.ModelSerializer):
-    # This field is read-only and can be used to display the total number of athletes/winners for the pool.
-    total_participants = serializers.IntegerField(read_only=True)
-
-    class Meta:
-        model = Pool
-        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants']
 
 
    
@@ -210,8 +244,22 @@ class AthletesSerializer(serializers.ModelSerializer):
 # for showing in user profile list  matches Achievements  ,lose and pending matches 
 User = get_user_model()
 
+# Create a nested serializer for Tournament to include the extra fields.
+# class TournamentsNestedSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Tournament
+#         fields = (
+#             # 'id',
+#             'cover_image',
+             
+#         )  
+        
+           
+
 class UserMatchSerializer(serializers.ModelSerializer):
     tournament = serializers.StringRelatedField()  # Shows tournament name
+    
+    cover_image = serializers.ImageField(source='tournament.cover_image', read_only=True)
     player_1 = serializers.CharField(source='player_1.username')
     player_2 = serializers.CharField(source='player_2.username')
     winner = serializers.SerializerMethodField()  # Returns winner's username (if available)
@@ -219,7 +267,7 @@ class UserMatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Match
-        fields = ('id', 'tournament', 'player_1', 'player_2', 'winner', 'date', 'status', 'match_result')
+        fields = ('id', 'tournament', 'player_1', 'player_2','winner','cover_image', 'date', 'status', 'match_result')
 
     def get_winner(self, obj):
         return obj.winner.username if obj.winner else None
@@ -245,13 +293,33 @@ class UserMatchSerializer(serializers.ModelSerializer):
  
  
 # Serializer for chat messages in a match
+# class MatchChatSerializer(serializers.ModelSerializer):
+#     sender = serializers.ReadOnlyField(source='sender.username')
+#     match = serializers.PrimaryKeyRelatedField(read_only=True)  # Mark match as read-only
+    
+#     class Meta:
+#         model = MatchChat
+#         fields = ['id', 'match', 'sender', 'message', 'timestamp']
+
 class MatchChatSerializer(serializers.ModelSerializer):
     sender = serializers.ReadOnlyField(source='sender.username')
-    match = serializers.PrimaryKeyRelatedField(read_only=True)  # Mark match as read-only
-    
+    sender_photo = serializers.SerializerMethodField()
+    match = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = MatchChat
-        fields = ['id', 'match', 'sender', 'message', 'timestamp']
+        fields = ['id', 'match', 'sender', 'sender_photo', 'message', 'timestamp']
+
+    def get_sender_photo(self, obj):
+        """
+        Returns the absolute URL of the sender's photo if available.
+        """
+        request = self.context.get("request")
+        if hasattr(obj.sender, 'photo') and obj.sender.photo:
+            if request:
+                return request.build_absolute_uri(obj.sender.photo.url)
+            return obj.sender.photo.url
+        return None
        
 
 class ClaimSerializer(serializers.ModelSerializer):
@@ -261,3 +329,6 @@ class ClaimSerializer(serializers.ModelSerializer):
     class Meta:
         model = Claim
         fields = ['id', 'user', 'phone_number', 'subject', 'details', 'created_at']
+        
+class UserTournamentCountSerializer(serializers.Serializer):
+    total_tournaments=serializers.IntegerField()        

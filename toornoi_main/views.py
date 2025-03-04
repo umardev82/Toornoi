@@ -1,9 +1,11 @@
 
-from rest_framework import viewsets,permissions
+from rest_framework import viewsets,permissions 
+from rest_framework.views import APIView
 from toornoi_user_management.models import User
 from .models import  Claim, MatchChat, Tournament,Match,TournamentRegistration,Pool
 from .serializers import ClaimSerializer, DisplayMatchSerializer, DisplayPoolSerializer, GetTournamentSerializer, MatchChatSerializer, PoolSerializer, TournamentRegistrationSerializer, TournamentSerializer,MatchSerializer,AthletesSerializer, UserMatchSerializer
 import stripe
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action 
 from rest_framework.decorators import api_view
 from django.db.models import Sum
@@ -79,31 +81,8 @@ class RegisterAthletesShowViewSet(viewsets.ModelViewSet):
     serializer_class = TournamentRegistrationSerializer
   
      
-     
-class MatchViewSet(viewsets.ModelViewSet):
-    queryset = Match.objects.all()
-    
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context.update({"request": self.request})
-        return context
 
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return DisplayMatchSerializer
-        return MatchSerializer
-
-    def perform_create(self, serializer):
-        serializer.save()
-       
-    #  if you wnat to get total actiave matches  http://127.0.0.1:8000/matches/pending-count/ 
-    @action(detail=False, methods=['get'], url_path='pending-count')
-    def pending_count(self, request):
-        """
-        Custom action to return the total number of matches with status 'Pending'.
-        """
-        pending_total = self.get_queryset().filter(status='Pending').count()
-        return Response({"Active_matches": pending_total})    
+ 
 # class MatchViewSet(viewsets.ModelViewSet):
 #     queryset = Match.objects.all()
     
@@ -128,16 +107,48 @@ def random_datetime(start, end):
     random_second = random.randrange(int_delta)
     return start + datetime.timedelta(seconds=random_second)
 
+def get_total_score(user, tournament):
+    """
+    Compute the total score for a user in the tournament across all completed matches.
+    This serves as the user's overall run rate.
+    """
+    matches = Match.objects.filter(tournament=tournament, status="Completed")
+    total = 0.0
+    for m in matches:
+        if m.player_1 == user:
+            score = m.result.get("player_1_score")
+            if score is not None:
+                total += float(score)
+        elif m.player_2 == user:
+            score = m.result.get("player_2_score")
+            if score is not None:
+                total += float(score)
+    return total
+
 def generate_matches(athletes, pool):
     """
     Randomly pairs athletes and creates matches within the pool's time range.
-    If an odd athlete remains, automatically advance that athlete (a 'bye')
-    by storing their user ID in pool.result.
+    If an odd number of athletes remains, award a bye:
+      - For the first pool, pick the last athlete.
+      - For subsequent pools, pick the athlete with the highest overall score (run rate).
     """
+    # If odd number of athletes, assign a bye.
+    if len(athletes) % 2 == 1:
+        if pool.pool_number > 1:
+            # Sort athletes descending by overall score.
+            athletes = sorted(athletes, key=lambda u: get_total_score(u, pool.tournament), reverse=True)
+            bye_player = athletes.pop(0)  # highest scorer gets bye
+        else:
+            bye_player = athletes.pop()  # For first pool, simply pop the last athlete.
+        if not isinstance(pool.result, dict):
+            pool.result = {}
+        pool.result.setdefault("bye", [])
+        pool.result["bye"].append(bye_player.id)
+        pool.save()
+    
+    # Shuffle remaining athletes and create matches.
     random.shuffle(athletes)
     matches = []
-    
-    # Create matches for pairs of athletes.
     while len(athletes) >= 2:
         player_1 = athletes.pop()
         player_2 = athletes.pop()
@@ -152,44 +163,110 @@ def generate_matches(athletes, pool):
             result={"player_1_score": None, "player_2_score": None, "submitted_by": {}}
         )
         matches.append(match)
-    
-    # If one athlete remains, mark them as a bye.
-    if athletes:
-        bye_player = athletes.pop()
-        if not isinstance(pool.result, dict):
-            pool.result = {}
-        pool.result.setdefault("bye", [])
-        pool.result["bye"].append(bye_player.id)
-        pool.save()
-    
     return matches
+
+def finalize_match(match):
+    """
+    Finalize an individual match:
+      - If both scores are submitted, the higher score wins.
+      - If only one score is submitted, the missing score is set to 0 and the submitting athlete wins.
+      - If neither score is submitted, the winner is determined by overall run rate.
+    After finalization, the match status is set to "Completed".
+    """
+    result = match.result or {}
+    score1 = result.get("player_1_score")
+    score2 = result.get("player_2_score")
+    
+    if score1 is not None and score2 is not None:
+        if float(score1) > float(score2):
+            match.winner = match.player_1
+        elif float(score2) > float(score1):
+            match.winner = match.player_2
+        else:
+            # In case of a tie, default to player_1 (or apply additional logic)
+            match.winner = match.player_1
+    elif score1 is not None and score2 is None:
+        result["player_2_score"] = 0
+        match.winner = match.player_1
+    elif score2 is not None and score1 is None:
+        result["player_1_score"] = 0
+        match.winner = match.player_2
+    else:
+        # Neither score submitted; use overall run rate.
+        total1 = get_total_score(match.player_1, match.tournament)
+        total2 = get_total_score(match.player_2, match.tournament)
+        match.winner = match.player_1 if total1 >= total2 else match.player_2
+
+    match.result = result
+    match.status = "Completed"
+    match.save()
+    return {"message": "Match finalized", "winner": match.winner.username}
+
+
+
+
+
+from django.utils import timezone 
+class MatchViewSet(viewsets.ModelViewSet):
+    queryset = Match.objects.all()
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({"request": self.request})
+        return context
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return DisplayMatchSerializer
+        return MatchSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+    
+    @action(detail=True, methods=['post'], url_path='finalize')
+    def finalize(self, request, pk=None):
+        """
+        Finalize an individual match if both players submitted their scores.
+        """
+        match = get_object_or_404(Match, pk=pk)
+        if timezone.now() < match.pool.end_date:
+            return Response({"error": "Pool deadline has not yet passed."}, status=status.HTTP_400_BAD_REQUEST)
+        result = finalize_match(match)
+        if "error" in result:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(match)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    #  if you wnat to get total actiave matches  http://127.0.0.1:8000/matches/pending-count/ 
+    @action(detail=False, methods=['get'], url_path='pending-count')
+    def pending_count(self, request):
+        """
+        Custom action to return the total number of matches with status 'Pending'.
+        """
+        pending_total = self.get_queryset().filter(status='Pending').count()
+        return Response({"Active_matches": pending_total})    
+
 class PoolViewSet(viewsets.ModelViewSet):
     """
-    A viewset for creating Pools and automatically generating matches.
-    The next pool is created by selecting winners from the previous pool,
-    along with any athletes who received a bye.
-    If fewer than 2 athletes remain, a message is returned that the tournament is complete.
+    A viewset for creating Pools and generating matches.
+    For Pool 1, all registered athletes are used.
+    For subsequent pools, winners (plus bye-advanced athletes) from the previous pool are used.
+    If fewer than 2 athletes remain, a message is returned stating the tournament is complete.
     """
     queryset = Pool.objects.all()
 
     def get_serializer_class(self):
-        if self.action == 'list':
-            return DisplayPoolSerializer
-        return PoolSerializer
+         if self.action in ['list', 'retrieve']:
+             return DisplayPoolSerializer
+         return PoolSerializer 
 
     @action(detail=False, methods=['get'], url_path='next-pool-number')
     def next_pool_number(self, request):
         tournament_id = request.query_params.get('tournament')
         if not tournament_id:
             return Response({"error": "Tournament parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            tournament = Tournament.objects.get(id=tournament_id)
-        except Tournament.DoesNotExist:
-            return Response({"error": "Tournament not found."}, status=status.HTTP_404_NOT_FOUND)
-        
+        tournament = get_object_or_404(Tournament, id=tournament_id)
         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
         next_pool_number = last_pool.pool_number + 1 if last_pool else 1
-
         return Response({
             "tournament": tournament.id,
             "next_pool_number": next_pool_number
@@ -200,43 +277,36 @@ class PoolViewSet(viewsets.ModelViewSet):
         tournament_id = data.get('tournament')
         if not tournament_id:
             return Response({"error": "Tournament is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            tournament = Tournament.objects.get(id=tournament_id)
-        except Tournament.DoesNotExist:
-            return Response({"error": "Tournament not found."}, status=status.HTTP_404_NOT_FOUND)
+        tournament = get_object_or_404(Tournament, id=tournament_id)
         
         # Calculate the next pool number.
         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
         next_pool_number = last_pool.pool_number + 1 if last_pool else 1
         data['pool_number'] = next_pool_number
 
-        # Determine athletes based on pool number.
         if next_pool_number == 1:
             # First pool: use all registered athletes.
             registration_ids = TournamentRegistration.objects.filter(tournament=tournament).values_list('user', flat=True)
             athletes = list(User.objects.filter(id__in=registration_ids))
             total_participants = len(athletes)
         else:
-            # Subsequent pools: use winners from the previous pool's completed matches...
+            # Subsequent pools: use winners from the previous pool's completed matches.
             previous_pool = Pool.objects.filter(tournament=tournament, pool_number=next_pool_number - 1).first()
             if not previous_pool:
                 return Response({"error": "Previous pool not found."}, status=status.HTTP_400_BAD_REQUEST)
             previous_matches = Match.objects.filter(pool=previous_pool, status='Completed')
-            athletes = [match.winner for match in previous_matches if match.winner]
-            # Also include athletes who received a bye.
+            athletes = [m.winner for m in previous_matches if m.winner]
+            # Also include bye-advanced athletes.
             if previous_pool.result and isinstance(previous_pool.result, dict):
                 bye_ids = previous_pool.result.get("bye", [])
                 if bye_ids:
                     bye_users = list(User.objects.filter(id__in=bye_ids))
                     athletes.extend(bye_users)
             total_participants = len(athletes)
-            # If fewer than 2 athletes remain, tournament is complete.
             if total_participants < 2:
                 return Response({"message": "Tournament is complete; no more users available to create the next pool."}, status=status.HTTP_200_OK)
         
         data['total_participants'] = total_participants
-
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         pool = serializer.save()
@@ -249,7 +319,146 @@ class PoolViewSet(viewsets.ModelViewSet):
             "message": f"{total_participants} participants are included in this pool, and the pool number is {next_pool_number}.",
             "pool": serializer.data
         }, status=status.HTTP_201_CREATED, headers=headers)
-#update code  start
+ # Finalize All Matches in a Pool:
+        # POST http://127.0.0.1:8000/pools/<pool_id>/finalize-matches/
+    @action(detail=True, methods=['post'], url_path='finalize-matches')
+    def finalize_matches(self, request, pk=None):
+        """
+        Finalize all pending matches in this pool.
+        This action should be called after the pool's end_date.
+        """
+        pool = get_object_or_404(Pool, pk=pk)
+        if timezone.now() < pool.end_date:
+            return Response({"error": "Pool deadline has not yet passed."}, status=status.HTTP_400_BAD_REQUEST)
+        pending_matches = pool.matches.filter(status="Pending")
+        results = []
+        for match in pending_matches:
+            res = finalize_match(match)
+            results.append({"match_id": match.id, "result": res})
+        return Response({
+            "message": "All pending matches finalized.",
+            "results": results
+        }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+# User = get_user_model()
+
+# def random_datetime(start, end):
+#     delta = end - start
+#     int_delta = delta.days * 24 * 3600 + delta.seconds
+#     random_second = random.randrange(int_delta)
+#     return start + datetime.timedelta(seconds=random_second)
+
+# def generate_matches(athletes, pool):
+#     random.shuffle(athletes)
+#     matches = []
+#     while len(athletes) >= 2:
+#         player_1 = athletes.pop()
+#         player_2 = athletes.pop()
+#         match_date = random_datetime(pool.start_date, pool.end_date)
+#         match = Match.objects.create(
+#             tournament=pool.tournament,
+#             pool=pool,
+#             player_1=player_1,
+#             player_2=player_2,
+#             date=match_date,
+#             status='Pending',
+#             result={"player_1_score": None, "player_2_score": None, "submitted_by": {}}
+#         )
+#         matches.append(match)
+#     if athletes:
+#         bye_player = athletes.pop()
+#         if not isinstance(pool.result, dict):
+#             pool.result = {}
+#         pool.result.setdefault("bye", [])
+#         pool.result["bye"].append(bye_player.id)
+#         pool.save()
+#     return matches
+
+# class PoolViewSet(viewsets.ModelViewSet):
+#     queryset = Pool.objects.all()
+
+#     def get_serializer_class(self):
+#         if self.action == 'list':
+#             return DisplayPoolSerializer
+#         return PoolSerializer
+
+#     @action(detail=False, methods=['get'], url_path='next-pool-number')
+#     def next_pool_number(self, request):
+#         tournament_id = request.query_params.get('tournament')
+#         if not tournament_id:
+#             return Response({"error": "Tournament parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+#         try:
+#             tournament = Tournament.objects.get(id=tournament_id)
+#         except Tournament.DoesNotExist:
+#             return Response({"error": "Tournament not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+#         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
+#         next_pool_number = last_pool.pool_number + 1 if last_pool else 1
+
+#         return Response({
+#             "tournament": tournament.id,
+#             "next_pool_number": next_pool_number
+#         })
+
+#     def create(self, request, *args, **kwargs):
+#         data = request.data.copy()
+#         tournament_id = data.get('tournament')
+#         if not tournament_id:
+#             return Response({"error": "Tournament is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         try:
+#             tournament = Tournament.objects.get(id=tournament_id)
+#         except Tournament.DoesNotExist:
+#             return Response({"error": "Tournament not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+#         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
+#         next_pool_number = last_pool.pool_number + 1 if last_pool else 1
+#         data['pool_number'] = next_pool_number
+
+#         if next_pool_number == 1:
+#             registration_ids = TournamentRegistration.objects.filter(tournament=tournament).values_list('user', flat=True)
+#             athletes = list(User.objects.filter(id__in=registration_ids))
+#             total_participants = len(athletes)
+#         else:
+#             previous_pool = Pool.objects.filter(tournament=tournament, pool_number=next_pool_number - 1).first()
+#             if not previous_pool:
+#                 return Response({"error": "Previous pool not found."}, status=status.HTTP_400_BAD_REQUEST)
+#             previous_matches = Match.objects.filter(pool=previous_pool, status='Completed')
+#             athletes = [match.winner for match in previous_matches if match.winner]
+#             if previous_pool.result and isinstance(previous_pool.result, dict):
+#                 bye_ids = previous_pool.result.get("bye", [])
+#                 if bye_ids:
+#                     bye_users = list(User.objects.filter(id__in=bye_ids))
+#                     athletes.extend(bye_users)
+#             total_participants = len(athletes)
+#             if total_participants < 2:
+#                 return Response({"message": "Tournament is complete; no more users available to create the next pool."}, status=status.HTTP_200_OK)
+        
+#         # Pass total_participants in the data so it gets saved in the model.
+#         data['total_participants'] = total_participants
+
+#         serializer = self.get_serializer(data=data)
+#         serializer.is_valid(raise_exception=True)
+#         # Save the pool with the provided total_participants value.
+#         pool = serializer.save()
+
+#         if total_participants >= 2:
+#             generate_matches(athletes, pool)
+
+#         headers = self.get_success_headers(serializer.data)
+#         return Response({
+#             "message": f"{total_participants} participants are included in this pool, and the pool number is {next_pool_number}.",
+#             "pool": serializer.data
+#         }, status=status.HTTP_201_CREATED, headers=headers)
+
+
+
 # for Atheles show  match listing   and submit result on it 
 class UserMatchesViewSet(viewsets.ReadOnlyModelViewSet):  # Use ReadOnlyModelViewSet
     queryset = Match.objects.all()
@@ -703,19 +912,37 @@ class ClaimViewSet(viewsets.ModelViewSet):
             
             
             
-# ViewSet for chat messages for a specific match
+# ViewSet for chat messages for a specific match  
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
+
 class MatchChatViewSet(viewsets.ModelViewSet):
     serializer_class = MatchChatSerializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Retrieve the match using the URL parameter.
         match_id = self.kwargs.get('match_pk')
-        return MatchChat.objects.filter(match__id=match_id).order_by('timestamp')
+        match = get_object_or_404(Match, id=match_id)
+        # Only allow access if the requesting user is one of the two players.
+        if self.request.user not in [match.player_1, match.player_2]:
+            raise PermissionDenied("You are not authorized to view this match's chats.")
+        return MatchChat.objects.filter(match=match).order_by('timestamp')
 
     def perform_create(self, serializer):
         match_id = self.kwargs.get('match_pk')
         match = get_object_or_404(Match, id=match_id)
-        serializer.save(match=match, sender=self.request.user)            
+        # Only allow message creation if the request user is a participant in the match.
+        if self.request.user not in [match.player_1, match.player_2]:
+            raise PermissionDenied("You are not authorized to send messages in this match.")
+        message_instance = serializer.save(match=match, sender=self.request.user)
+        
+        # Optionally, notify the other participant.
+        # Determine the "other" user:
+        other_user = match.player_1 if self.request.user != match.player_1 else match.player_2
+        # Call your push notification service here to send the message to other_user.
+        # For example:
+        # send_push_notification(other_user, message_instance.message)          
         
         
         
@@ -726,4 +953,72 @@ class TotalclaimViewSet(viewsets.ViewSet):
         total_claim = Claim.objects.all().count()
         
         # Return the total number of users as a response
-        return Response({"total_claim": total_claim})           
+        return Response({"total_claim": total_claim})     
+  
+  
+#total number of tournaments a user has participated  in user profile list  
+class UserTournamentCountView(APIView):
+    
+    def get(self, request, format=None):
+        # Count distinct tournaments for which the logged-in user is registered.
+        total=TournamentRegistration.objects.filter(user=request.user).values('tournament').distinct().count()
+        return Response ({"total_tournamnets_participated":total})
+        
+
+# the total number of tournaments the authenticated user has total won and total lost and total_prize
+class UserTournamentResultsView(APIView):
+    """
+    API endpoint that returns the total number of tournaments the authenticated user 
+    has won and lost, and also the total prize (from tournament.positions_1) they earned 
+    from winning tournaments.
+    
+    A tournament is considered complete if its final pool (the one with the highest pool_number)
+    contains at least one Completed match. The winner of that final match is considered the tournament winner.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        
+        # Get distinct tournament IDs where the user registered.
+        tournament_ids = TournamentRegistration.objects.filter(user=user)\
+                            .values_list('tournament', flat=True).distinct()
+        
+        tournaments_won = 0
+        tournaments_lost = 0
+        total_prize = 0
+
+        for tid in tournament_ids:
+            try:
+                tournament = Tournament.objects.get(id=tid)
+            except Tournament.DoesNotExist:
+                continue
+            
+            # Get the final (last) pool of the tournament.
+            final_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
+            if not final_pool:
+                continue
+            
+            # Get the final match in that pool that is Completed.
+            final_match = Match.objects.filter(pool=final_pool, status="Completed").order_by('-id').first()
+            if not final_match:
+                continue
+
+            # Check if the user participated in the tournament final.
+            if final_match.winner == user:
+                tournaments_won += 1
+                # Add the tournament prize from positions_1 (if set)
+                if tournament.positions_1:
+                    try:
+                        total_prize += int(tournament.positions_1)
+                    except ValueError:
+                        # If positions_1 is not a number, skip it.
+                        pass
+            else:
+                tournaments_lost += 1
+
+        return Response({
+            "tournaments_won": tournaments_won,
+            "tournaments_lost": tournaments_lost,
+            "total_prize": total_prize
+        })

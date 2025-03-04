@@ -74,7 +74,7 @@ class Pool(models.Model):
     pool_number = models.IntegerField()  # e.g., 1 for Pool 1, 2 for Pool 2, etc.
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    
+    total_participants = models.IntegerField(default=0)  # Add this field
     result = models.JSONField(default=dict, blank=True)  # Added field for storing extra pool data (e.g., bye athletes)
     created_at = models.DateTimeField(auto_now_add=True)
 

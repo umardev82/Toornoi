@@ -7,9 +7,7 @@ from django.conf import settings
 from django.urls import reverse
 import uuid
 
-# for google auth 
-class IdTokenSerializer(serializers.Serializer):
-    id_token = serializers.CharField()
+
 
 
 #admin login
