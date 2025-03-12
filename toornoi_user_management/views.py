@@ -76,13 +76,16 @@ class SuperAdminUpdateProfileView(APIView):
 # for user  Register
 from django.core.mail import send_mail
 from django.urls import reverse
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 class RegisterUserView(APIView):
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
-            # Check if the user is already registered but not verified
+            
+            # Check if user is already registered but not verified
             user = User.objects.filter(email=email, is_active=False).first()
             if user:
                 return Response(
@@ -98,17 +101,56 @@ class RegisterUserView(APIView):
             # Construct the verification link
             verify_link = f"https://toornoi.com/verify-email/?token={token}"
             
-            # Send the verification email
+            # Render email template
+            context = {"username": user.username, "verify_link": verify_link}
+            html_message = render_to_string("emails/verify_email.html", context)
+            plain_message = strip_tags(html_message)  # Fallback for plain-text emails
+
+            # Send email
             send_mail(
-                'Verify Your Account',
-                f'Click the link to verify your account: {verify_link}',
-                'chumarlatif123@gmail.com',  
-                [user.email],
+                subject="Welcome to Toornoi.com – Confirm Your Registration",
+                message=plain_message,
+                from_email="meatitd9@gmail.com",
+                recipient_list=[user.email],
+                html_message=html_message,  # This sends the HTML email
                 fail_silently=False,
             )
-            
+
             return Response({"message": "Check your email for the verification link."}, status=status.HTTP_201_CREATED)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class RegisterUserView(APIView):
+#     def post(self, request):
+#         serializer = UserRegistrationSerializer(data=request.data)
+#         if serializer.is_valid():
+#             email = serializer.validated_data['email']
+#             # Check if the user is already registered but not verified
+#             user = User.objects.filter(email=email, is_active=False).first()
+#             if user:
+#                 return Response(
+#                     {"message": "User already registered but not verified. Redirecting to resend email."},
+#                     status=status.HTTP_302_FOUND
+#                 )
+
+#             # Save the new user
+#             user = serializer.save()
+#             token = uuid.uuid4().hex
+#             cache.set(token, user.id, timeout=3600)
+
+#             # Construct the verification link
+#             verify_link = f"https://toornoi.com/verify-email/?token={token}"
+            
+#             # Send the verification email
+#             send_mail(
+#                 'Verify Your Account',
+#                 f'Click the link to verify your account: {verify_link}',
+#                 'chumarlatif123@gmail.com',  
+#                 [user.email],
+#                 fail_silently=False,
+#             )
+            
+#             return Response({"message": "Check your email for the verification link."}, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 

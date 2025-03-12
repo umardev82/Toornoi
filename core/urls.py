@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from  toornoi_main.views import AthletesViewSet, ClaimViewSet, MatchChatViewSet, MatchViewSet, PoolViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentCountView, UserTournamentResultsView, UserTournamentsViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
+from  toornoi_main.views import AthletesViewSet, ClaimViewSet, ContactFormAPIView, MatchChatViewSet, MatchViewSet, NotificationViewSet, PoolViewSet, PrizeViewSet, PublishedTournamentViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentCountView, UserTournamentResultsView, UserTournamentsViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
 
 
 
@@ -49,6 +49,7 @@ router.register('my_tournaments', UserTournamentsViewSet, basename='my_tournamen
 router.register('user/matches', UserMatchesViewSet, basename='user-matches')
 router.register('pools', PoolViewSet, basename='pool')
 
+router.register('notifications', NotificationViewSet, basename='notifications')
 #for user  show tournament list and resgister on it 
 router.register('tournament_user', TournamentsViewSet, basename='tournament_user')
 
@@ -56,10 +57,13 @@ router.register('tournament_user', TournamentsViewSet, basename='tournament_user
 router.register('profile-matches', UsersMatchesViewSet, basename='profile-matches')
 #  total number of tournaments a user has participated  in user profile list
 # http://127.0.0.1:8000/api/user/tournaments/count/
-
+#update "claim_status": "Resolved"  and send email to user  POST Method  http://127.0.0.1:8000/claims/1/update-claim-status/
 router.register('claims', ClaimViewSet, basename='claims')
 router.register('total_claim',TotalclaimViewSet,basename='total_claim')
 
+# update status is paid  and send email to user  POST Method http://127.0.0.1:8000/prize/1/update_payment_status/
+router.register('prize',PrizeViewSet,basename='prize')
+router.register('published-tournaments', PublishedTournamentViewSet, basename='published-tournaments')
 # path('user/tournaments/count/', UserTournamentCountView.as_view(), name='user-tournament-count'),
 
     # For nested MatchChat endpoints, we define separate views.
@@ -77,12 +81,16 @@ match_chat_detail = MatchChatViewSet.as_view({
 
 
 urlpatterns = [
+    
+    # on Contact as form  sends an email to admin user: 
+     path('contact/', ContactFormAPIView.as_view(), name='contact-form'),
 # GET /matches/<match_pk>/chats/: Retrieves the conversation (i.e., all chat messages) for the specified match.
 # POST /matches/<match_pk>/chats/: Allows an authenticated user (one of the two players) to
     path('matches/<int:match_pk>/chats/', match_chat_list, name='match-chat-list'),
     
     # update ,DELETE http://127.0.0.1:8000/matches/2/chats/5/
     path('matches/<int:match_pk>/chats/<int:pk>/', match_chat_detail, name='match-chat-detail'),
+    
     
     
     path('admin/', admin.site.urls),

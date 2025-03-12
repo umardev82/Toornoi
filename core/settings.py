@@ -68,7 +68,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -148,22 +148,27 @@ MEDIA_URL = '/Toornoi/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 import os
-# Email settings
-# Email settings for SendGrid
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.sendgrid.net'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'apikey'  # This must literally be 'apikey'
-# EMAIL_HOST_PASSWORD = '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'  # Replace with your SendGrid API key
-
-
+# # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER ='meatitd9@gmail.com'
 EMAIL_HOST_PASSWORD ='knhqsglmioibgdqm'
+
+
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'email-smtp.us-east-1.amazonaws.com'  # Change based on your AWS region
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'AKIATAVABJO7BYT7AQXL'  # Copy from AWS
+# EMAIL_HOST_PASSWORD = 'BMKp2y6DCY0ehJ3s939Vi9cBiYhWKOAZZlA1Kn1OQoie'
+# # DEFAULT_FROM_EMAIL = 'your_verified_email@example.com'  # Must be verified in SES
+
+
+
+
 
 
 
@@ -178,14 +183,19 @@ REST_FRAMEWORK = {
 
 
 
-STRIPE_SECRET_KEY = ""
+STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
 
-STRIPE_ENDPOINT_SECRET = ""
-                        #   whsec_mhHKaDI0oNZdYD1zjftzPHBaolYrAA9p
+STRIPE_ENDPOINT_SECRET = "whsec_mhHKaDI0oNZdYD1zjftzPHBaolYrAA9p"
+# STRIPE_ENDPOINT_SECRET = "whsec_c3a828789646f231d69716991c5e2a2d8dd67759aa3d39360decb62a1d2f41fa"                        
+DEFAULT_FROM_EMAIL = 'umardev82@gmail.com'
+
+# OneSignal configuration:
+
+# ONESIGNAL_APP_ID = '23b64ee4-fc2d-4b06-8fc2-13b051436765'
+                    
+# ONESIGNAL_REST_API_KEY = 'os_v2_app_eo3e5zh4fvfqnd6ccoyfcq3hmv3qm23vbw4esmeg67dd4czsav6t2m3vombpi57u2wxghmy5hbpltrpavjpe63m4lygvznnneaacwaq'
 
 
-
-# whsec_EP07U9DJ3Nr1AjSKqY9EPvC0nlOqWmVH
 APPEND_SLASH = False
 
 

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Your Account</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+            text-align: center;
+        }
+        .email-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            margin: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 20px;
+            background: #007bff;
+            color: black;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <h2>Welcome to Toornoi.com!</h2>
+        <h3> Dear {{ username }},</h3>
+        <p>Your account has been successfully created. Click the button below to verify your email, Please verify account  with in 1 hour otherwise this link is expired :</p>
+        <a href="{{ verify_link }}" class="button">Verify Your Account</a>
+        <p class="footer">If you did not create this account, you can ignore this email.</p>
+        <p class="footer">Best regards,<br>Toornoi.com Team</p>
+    </div>
+</body>
+</html>

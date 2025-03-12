@@ -1,15 +1,60 @@
+import datetime
 from rest_framework import serializers
 from toornoi_user_management.models import User
-from .models import  Claim, MatchChat, Tournament,Match, TournamentRegistration,Pool
+from .models import  Claim, MatchChat, Notification, Prize, Tournament,Match, TournamentRegistration,Pool
 from django.contrib.auth import get_user_model
 
 # for admin panel 
 
-
-class TournamentSerializer(serializers.ModelSerializer):
+#  user dashboard  /my_tournaments/my_tournaments
+class MyTournamentUsersSerializer(serializers.ModelSerializer):
+    pool_number = serializers.SerializerMethodField()
+    total_pool = serializers.SerializerMethodField()
     class Meta:
         model = Tournament
         fields = '__all__'  # Include all tournament fields
+        
+    def get_pool_number(self, obj):
+        """Get the latest (highest) pool_number for the tournament."""
+        pool = Pool.objects.filter(tournament=obj).order_by('-pool_number').first()
+        return pool.pool_number if pool else None
+
+    def get_total_pool(self, obj):
+        pool = Pool.objects.filter(tournament=obj).order_by('pool_number').first()
+        return pool.total_pool if pool else 0  # Default to 0 if no pool exists    
+        
+ 
+        
+class TournamentSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Tournament
+        fields = '__all__'  # Include all tournament fields
+    def validate(self, data):
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+        registration_deadline = data.get("registration_deadline")
+
+        # Convert to date (to avoid TypeError)
+        if start_date:
+            start_date = start_date.date() if isinstance(start_date, datetime.datetime) else start_date
+        if end_date:
+            end_date = end_date.date() if isinstance(end_date, datetime.datetime) else end_date
+        if registration_deadline:
+            registration_deadline = registration_deadline.date() if isinstance(registration_deadline, datetime.datetime) else registration_deadline
+
+        # Validate start_date < end_date
+        if start_date and end_date:
+            if start_date >= end_date:
+                raise serializers.ValidationError({"start_date": "Start date must be before the end date."})
+
+        # Validate registration_deadline < start_date
+        if registration_deadline and start_date:
+            if registration_deadline >= start_date:
+                raise serializers.ValidationError({"registration_deadline": "Registration deadline must be before the start date."})
+
+        return data
+        
 from .models import Tournament, TournamentRegistration
 
 class GetTournamentSerializer(serializers.ModelSerializer):
@@ -66,10 +111,10 @@ class DisplayPoolSerializer(serializers.ModelSerializer):
     winner_players = serializers.SerializerMethodField()
     loser_players = serializers.SerializerMethodField()
     tournament = serializers.StringRelatedField()  # Display the tournament name
-
+    all_players=serializers.SerializerMethodField()
     class Meta:
         model = Pool
-        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants','winner_players','loser_players'] 
+        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants','total_pool','winner_players','loser_players', 'all_players'] 
            
     def get_winner_players(self, obj):
         """
@@ -98,7 +143,30 @@ class DisplayPoolSerializer(serializers.ModelSerializer):
                 else:
                     losers.append(match.player_1.username)
         return losers
+    
 
+    
+    def get_all_players(self, obj):
+        """
+        Returns a list of all player usernames in this pool:
+         - Includes players from all matches (both player_1 and player_2)
+         - Also includes athletes who received a bye (stored in pool.result["bye"])
+        """
+        players_set = set()
+        # Include players from matches.
+        for match in obj.matches.all():
+            if match.player_1:
+                players_set.add(match.player_1.username)
+            if match.player_2:
+                players_set.add(match.player_2.username)
+        # Also include bye players.
+        if isinstance(obj.result, dict):
+            bye_ids = obj.result.get("bye", [])
+            if bye_ids:
+                bye_users = User.objects.filter(id__in=bye_ids).values_list('username', flat=True)
+                players_set.update(bye_users)
+        # Return sorted list if desired.
+        return sorted(list(players_set))
         
 class PoolSerializer(serializers.ModelSerializer):
     # This field is read-only and can be used to display the total number of athletes/winners for the pool.
@@ -107,7 +175,14 @@ class PoolSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pool
         # fields='__all__'
-        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants']
+        fields = ['id', 'tournament', 'pool_number', 'start_date', 'end_date', 'total_participants','total_pool']
+    def validate(self, data):
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+        if start_date and end_date:
+            if start_date >= end_date:
+                raise serializers.ValidationError({"start_date": "Start date must be before the end date."})
+        return data
 
 
 #update code  start
@@ -137,7 +212,7 @@ class DisplayMatchSerializer(serializers.ModelSerializer):
     player_1_photo = serializers.SerializerMethodField()
     player_2_photo = serializers.SerializerMethodField()
     admin_username = serializers.SerializerMethodField()
-    pool = serializers.IntegerField(source='pool.pool_number', read_only=True)
+    pool = serializers.CharField(source='pool.pool_number', read_only=True)
     winner = serializers.CharField(source='winner.username', allow_null=True)  # Display winner's username
     result = serializers.JSONField()  # Display the JSON result as is
 
@@ -328,7 +403,38 @@ class ClaimSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Claim
-        fields = ['id', 'user', 'phone_number', 'subject', 'details', 'created_at']
+        fields = ['id', 'user', 'phone_number', 'subject', 'details','image', 'claim_status','created_at']
+       
+       
         
 class UserTournamentCountSerializer(serializers.Serializer):
-    total_tournaments=serializers.IntegerField()        
+    total_tournaments=serializers.IntegerField()    
+    
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        # fields = '__all__'
+        fields = ['id', 'title', 'message', 'created_at', 'is_read']        
+        
+        
+#Contact Form submit Serializer     
+class ContactFormSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+    message = serializers.CharField()       
+
+
+#prize serializer
+class PrizeDisplaySerializer(serializers.ModelSerializer):
+    tournament=serializers.StringRelatedField()
+    winner=serializers.CharField(source='winner.username')
+    class Meta:
+        model=Prize   
+        fields= '__all__'   
+class PrizeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=Prize   
+        fields= '__all__'     
+        
+        
