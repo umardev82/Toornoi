@@ -2,8 +2,8 @@
 from rest_framework import viewsets,permissions 
 from rest_framework.views import APIView
 from toornoi_user_management.models import User
-from .models import  Claim, MatchChat, Notification, Prize, Tournament,Match,TournamentRegistration,Pool
-from .serializers import ClaimSerializer, ContactFormSerializer, DisplayMatchSerializer, DisplayPoolSerializer, GetTournamentSerializer, MatchChatSerializer, MyTournamentUsersSerializer, NotificationSerializer, PoolSerializer, PrizeDisplaySerializer, PrizeSerializer, TournamentRegistrationSerializer, TournamentSerializer,MatchSerializer,AthletesSerializer, UserMatchSerializer
+from .models import  Claim, MatchChat, Notification, Prize, Tournament,Match,TournamentRegistration,Pool, TournamentType, category
+from .serializers import CategorySerializer, ClaimSerializer, ContactFormSerializer, DisplayMatchSerializer, DisplayPoolSerializer, DisplayTournamentSerializer, GetTournamentSerializer, MatchChatSerializer, MyTournamentUsersSerializer, NotificationSerializer, PoolSerializer, PrizeDisplaySerializer, PrizeSerializer, TournamentRegistrationSerializer, TournamentSerializer,MatchSerializer,AthletesSerializer, TournamentTypeSerializer, UserMatchSerializer
 import stripe
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action 
@@ -22,13 +22,31 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from .notifications import send_push_notification
-
+from django.core.mail import send_mail
 # for admin panel 
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
 
+
+class TournamentTypeViewSet(viewsets.ModelViewSet):
+    queryset = TournamentType.objects.all()
+    serializer_class = TournamentTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    
+    
+    
 class Tournamentviewset(viewsets.ModelViewSet):
     queryset=Tournament.objects.all()
-    serializer_class=TournamentSerializer
-    
+    permission_classes = [IsAuthenticated]
+
+    # serializer_class=TournamentSerializer
+    def get_serializer_class(self):
+       if self.action in ['list','retrieve']:
+           return DisplayTournamentSerializer
+       return TournamentSerializer
     
     @action(detail=True, methods=['get'])
     def registered_users(self, request, pk=None):
@@ -56,10 +74,14 @@ class Tournamentviewset(viewsets.ModelViewSet):
 class AthleteViewSet(viewsets.ModelViewSet):
     queryset = User.objects.exclude(is_superuser=1)  # Exclude the first user by ID
     serializer_class = AthletesSerializer
+    permission_classes = [IsAuthenticated]
+
     
     
  # For admin panel show  total number of  Athletes    
 class AthletesViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
     def list(self, request):
         # Exclude the first user by ID and count the rest
         total_users = User.objects.exclude(is_superuser=1).count()
@@ -70,6 +92,8 @@ class AthletesViewSet(viewsets.ViewSet):
     
  # For admin panel show  total number of  Athletes    
 class TournamentAllViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
     def list(self, request):
         # Exclude the first user by ID and count the rest
         total_tournaments = Tournament.objects.all().count()
@@ -81,23 +105,10 @@ class TournamentAllViewSet(viewsets.ViewSet):
 class RegisterAthletesShowViewSet(viewsets.ModelViewSet):
     queryset = TournamentRegistration.objects.all()
     serializer_class = TournamentRegistrationSerializer
+    permission_classes = [IsAuthenticated]
+
   
      
-
- 
-# class MatchViewSet(viewsets.ModelViewSet):
-#     queryset = Match.objects.all()
-    
-#     # Use DisplayMatchSerializer for listing matches
-#     def get_serializer_class(self):
-#         if self.action == 'list':
-#             return DisplayMatchSerializer
-#         return MatchSerializer
-
-#     def perform_create(self, serializer):
-#         # Any custom logic during creation (you can add extra logic here if needed)
-#         serializer.save()
- 
 
 
 User = get_user_model()
@@ -127,45 +138,6 @@ def get_total_score(user, tournament):
                 total += float(score)
     return total
 
-# def generate_matches(athletes, pool):
-#     """
-#     Randomly pairs athletes and creates matches within the pool's time range.
-#     If an odd number of athletes remains, award a bye:
-#       - For the first pool, pick the last athlete.
-#       - For subsequent pools, pick the athlete with the highest overall score (run rate).
-#     """
-#     # If odd number of athletes, assign a bye.
-#     if len(athletes) % 2 == 1:
-#         if pool.pool_number > 1:
-#             # Sort athletes descending by overall score.
-#             athletes = sorted(athletes, key=lambda u: get_total_score(u, pool.tournament), reverse=True)
-#             bye_player = athletes.pop(0)  # highest scorer gets bye
-#         else:
-#             bye_player = athletes.pop()  # For first pool, simply pop the last athlete.
-#         if not isinstance(pool.result, dict):
-#             pool.result = {}
-#         pool.result.setdefault("bye", [])
-#         pool.result["bye"].append(bye_player.id)
-#         pool.save()
-    
-#     # Shuffle remaining athletes and create matches.
-#     random.shuffle(athletes)
-#     matches = []
-#     while len(athletes) >= 2:
-#         player_1 = athletes.pop()
-#         player_2 = athletes.pop()
-#         match_date = random_datetime(pool.start_date, pool.end_date)
-#         match = Match.objects.create(
-#             tournament=pool.tournament,
-#             pool=pool,
-#             player_1=player_1,
-#             player_2=player_2,
-#             date=match_date,
-#             status='Pending',
-#             result={"player_1_score": None, "player_2_score": None, "submitted_by": {}}
-#         )
-#         matches.append(match)
-#     return matches
 def generate_matches(athletes, pool):
     """
     Randomly pairs athletes and creates matches within the pool's time range.
@@ -173,7 +145,7 @@ def generate_matches(athletes, pool):
     award a bye by storing their user ID in pool.result.
     """
     # Check if the pool is not Final.
-    if pool.pool_number != "Final" and len(athletes) % 2 == 1:
+    if pool.pool_number != "Finale" and len(athletes) % 2 == 1:
         bye_player = athletes.pop()
         if not isinstance(pool.result, dict):
             pool.result = {}
@@ -192,7 +164,7 @@ def generate_matches(athletes, pool):
             player_1=player_1,
             player_2=player_2,
             date=match_date,
-            status='Pending',
+            status='En attente',
             result={"player_1_score": None, "player_2_score": None, "submitted_by": {}}
         )
         matches.append(match)
@@ -232,9 +204,9 @@ def finalize_match(match):
         match.winner = match.player_1 if total1 >= total2 else match.player_2
 
     match.result = result
-    match.status = "Completed"
+    match.status = "Complété"
     match.save()
-    return {"message": "Match finalized", "winner": match.winner.username}
+    return {"message": " Match terminé", "winner": match.winner.username}
 
 
 
@@ -243,6 +215,8 @@ def finalize_match(match):
 from django.utils import timezone 
 class MatchViewSet(viewsets.ModelViewSet):
     queryset = Match.objects.all()
+    permission_classes = [IsAuthenticated]
+
     
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -276,13 +250,16 @@ class MatchViewSet(viewsets.ModelViewSet):
         """
         Custom action to return the total number of matches with status 'Pending'.
         """
-        pending_total = self.get_queryset().filter(status='Pending').count()
+        pending_total = self.get_queryset().filter(status='En attente').count()
         return Response({"Active_matches": pending_total})    
 
-
+from django.conf import settings
+from django.core.mail import send_mail
 #pool Creations 
 class PoolViewSet(viewsets.ModelViewSet):
     queryset = Pool.objects.all()
+    permission_classes = [IsAuthenticated]
+
 
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve']:
@@ -293,11 +270,11 @@ class PoolViewSet(viewsets.ModelViewSet):
     def next_pool_number(self, request):
         tournament_id = request.query_params.get('tournament')
         if not tournament_id:
-            return Response({"error": "Tournament parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Le paramètre du tournoi est requis."}, status=status.HTTP_400_BAD_REQUEST)
         tournament = get_object_or_404(Tournament, id=tournament_id)
         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
         # If last pool exists and its pool_number is not "Final", then next is numeric.
-        if last_pool and last_pool.pool_number != "Final":
+        if last_pool and last_pool.pool_number != "Finale":
             next_pool_number = int(last_pool.pool_number) + 1
         else:
             next_pool_number = 1
@@ -306,55 +283,11 @@ class PoolViewSet(viewsets.ModelViewSet):
             "next_pool_number": next_pool_number
         })
 
-    # def create(self, request, *args, **kwargs):
-    #     data = request.data.copy()
-    #     tournament_id = data.get('tournament')
-    #     if not tournament_id:
-    #         return Response({"error": "Tournament is required."}, status=status.HTTP_400_BAD_REQUEST)
-    #     tournament = get_object_or_404(Tournament, id=tournament_id)
-        
-    #     # Calculate next pool number.
-    #     last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
-    #     if last_pool and last_pool.pool_number != "Final":
-    #         next_pool_number = int(last_pool.pool_number) + 1
-    #     else:
-    #         next_pool_number = 1
-        
-    #     # Determine athletes.
-    #     if next_pool_number == 1:
-    #         registration_ids = TournamentRegistration.objects.filter(tournament=tournament).values_list('user', flat=True)
-    #         athletes = list(User.objects.filter(id__in=registration_ids))
-    #         total_participants = len(athletes)
-    #     else:
-    #         previous_pool = Pool.objects.filter(tournament=tournament, pool_number=last_pool.pool_number).first()
-    #         if not previous_pool:
-    #             return Response({"error": "Previous pool not found."}, status=status.HTTP_400_BAD_REQUEST)
-    #         previous_matches = Match.objects.filter(pool=previous_pool, status='Completed')
-    #         athletes = [m.winner for m in previous_matches if m.winner]
-    #         if previous_pool.result and isinstance(previous_pool.result, dict):
-    #             bye_ids = previous_pool.result.get("bye", [])
-    #             if bye_ids:
-    #                 bye_users = list(User.objects.filter(id__in=bye_ids))
-    #                 athletes.extend(bye_users)
-    #         total_participants = len(athletes)
-    #         if total_participants < 2:
-    #             return Response({"message": "Tournament is complete; no more users available to create the next pool."}, status=status.HTTP_200_OK)
-        
-    #     # If exactly 2 athletes remain, mark this pool as Final.
-    #     if total_participants == 2:
-    #         data['pool_number'] = "Final"
-    #     else:
-    #         data['pool_number'] = str(next_pool_number)
-    #     data['total_participants'] = total_participants
-        
-    #     serializer = self.get_serializer(data=data)
-    #     serializer.is_valid(raise_exception=True)
-    #     pool = serializer.save()
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         tournament_id = data.get('tournament')
         if not tournament_id:
-            return Response({"error": "Tournament is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": " Le tournoi est requis."}, status=status.HTTP_400_BAD_REQUEST)
         tournament = get_object_or_404(Tournament, id=tournament_id)
         
         # Compute total number of paid registered users.
@@ -369,7 +302,7 @@ class PoolViewSet(viewsets.ModelViewSet):
         
         # Calculate next pool number.
         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
-        if last_pool and last_pool.pool_number != "Final":
+        if last_pool and last_pool.pool_number != "Finale":
             next_pool_number = int(last_pool.pool_number) + 1
         else:
             next_pool_number = 1
@@ -381,7 +314,7 @@ class PoolViewSet(viewsets.ModelViewSet):
         else:
             previous_pool = Pool.objects.filter(tournament=tournament, pool_number=last_pool.pool_number).first()
             if not previous_pool:
-                return Response({"error": "Previous pool not found."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Tour précédent introuvable."}, status=status.HTTP_400_BAD_REQUEST)
             previous_matches = Match.objects.filter(pool=previous_pool, status='Completed')
             athletes = [m.winner for m in previous_matches if m.winner]
             if previous_pool.result and isinstance(previous_pool.result, dict):
@@ -391,11 +324,11 @@ class PoolViewSet(viewsets.ModelViewSet):
                     athletes.extend(bye_users)
             total_participants = len(athletes)
             if total_participants < 2:
-                return Response({"message": "Tournament is complete; no more users available to create the next pool."}, status=status.HTTP_200_OK)
+                return Response({"message": "Le tournoi est terminé ; aucun joueur disponible pour créer le tour suivant."}, status=status.HTTP_200_OK)
         
         # If exactly 2 athletes remain, this pool is the Final pool.
         if total_participants == 2:
-            data['pool_number'] = "Final"
+            data['pool_number'] = "Finale"
         else:
             data['pool_number'] = str(next_pool_number)
         data['total_participants'] = total_participants
@@ -409,159 +342,138 @@ class PoolViewSet(viewsets.ModelViewSet):
         if total_participants >= 2:
             generate_matches(athletes, pool)
         
+        
+            # **Create Notifications for each player with Match Time**
+        for match in pool.matches.all():
+            match_time_str = match.date.strftime("%y-%m-%d %H:%M")  # Format match date/time
+        
+            match_link = f"https://toornoi.com/my-account/match/{match.id}/"  # Generate match link
+                # match_link = f"http://127.0.0.1:8000/matches/{match.id}/" 
+
+            Notification.objects.create(
+               user=match.player_1,
+                title="Nouveau match créé",
+               message=f"Votre match contre {match.player_2.username} est prévu le {match_time_str}. "
+                         f"Voici le lien du match: {match_link}",
+           )
+
+            Notification.objects.create(
+                user=match.player_2,
+                title="Nouveau match créé",
+                message=f"Votre match contre {match.player_1.username} est prévu le {match_time_str}. "
+                        f"Voici le lien du match: {match_link}",
+            )   
+        # for match in pool.matches.all():
+        #     match_time_str=match.date.strftime("%y-%m-%d %H:%M") # Format match date/time
+        #     Notification.objects.create(
+        #         user=match.player_1,
+        #         title="Nouveau match créé",
+        #         message=f"Votre match contre {match.player_2.username} est prévu le {match_time_str}.",
+        #     )
+        #     Notification.objects.create(
+        #         user=match.player_2,
+        #         title="Nouveau match créé",
+        #         message=f"Votre match contre {match.player_1.username} est prévu le {match_time_str}.",
+        #     )
+        
+        
         # Send email notifications for match creation.
         for match in pool.matches.all():
             match_time_str = match.date.strftime("%Y-%m-%d %H:%M")
             match_rules = match.tournament.rules_and_regulations if hasattr(match.tournament, "rules_and_regulations") else "Standard rules apply"
             
             # If this is the final pool, use a special final match email template.
-            if pool.pool_number == "Final":
-                final_subject = "The Final Showdown – Your Match Details"
+            if pool.pool_number == "Finale":
+                final_subject = " L'épreuve finale ���� Détails de votre match"
                 # Email for player 1.
-                final_message_p1 = f"""Dear {match.player_1.username},
+                final_message_p1 = f"""Cher {match.player_1.username},
 
-Congratulations on making it to the final round! This is your chance to win the grand prize.
-- Final Match Against: {match.player_2.username}
-- Match Time: {match_time_str}
-- Prize Bond: €{match.tournament.positions_1}
+Félicitations pour votre participation à la phase finale ! C'est maintenant votre chance de gagner le prix final.
+- Match final contre: {match.player_2.username}
+- Heure du match : {match_time_str}
+- Prix final : €{match.tournament.positions_1}
 
 
-Best of luck - may the best athlete win!
+Bonne chance - que le meilleur athlète gagne !
 
-Best regards,
-Toornoi.com Team
+Cordialement, 
+L'équipe de Toornoi.com
+
 """
-                send_mail(final_subject, final_message_p1, settings.DEFAULT_FROM_EMAIL, [match.player_1.email])
+                send_mail(final_subject, final_message_p1,"contact@toornoi.com",[match.player_1.email])
                 # Email for player 2.
-                final_message_p2 = f"""Dear {match.player_2.username},
+                final_message_p2 = f"""Cher {match.player_2.username},
 
-Congratulations on making it to the final round! This is your chance to win the grand prize.
-- Final Match Against: {match.player_1.username}
-- Match Time: {match_time_str}
-- Prize Bond: €{match.tournament.positions_1}
+Félicitations pour votre participation à la phase finale ! C'est maintenant votre chance de gagner le prix final.
+- Match final contre: {match.player_1.username}
+- Heure du match: {match_time_str}
+- Prix final: €{match.tournament.positions_1}
 
-Best of luck - may the best athlete win!
+Bonne chance - que le meilleur athlète gagne !
 
-Best regards,
-Toornoi.com Team
+Cordialement, 
+L'équipe de Toornoi.com
 """
-                send_mail(final_subject, final_message_p2, settings.DEFAULT_FROM_EMAIL, [match.player_2.email])
+                send_mail(final_subject, final_message_p2,"contact@toornoi.com",[match.player_2.email])
             else:
                 # Regular pool match email.
-                subject = "Tournament Pools Created – Get Ready for Your Match!"
-                email_message_p1 = f"""Dear {match.player_1.username},
+                subject = " Poules de tournoi créées ���� Préparez-vous pour votre match !"
+                email_message_p1 = f"""Cher {match.player_1.username},
 
-The tournament pools have been created! Your match is scheduled as follows:
+Les poules du tournoi ont été créées ! Votre match est programmé comme suit:
 
-- Opponent: {match.player_2.username}
-- Match Time: {match_time_str}
-- Match Rules: {match_rules}
+-Adversaire: {match.player_2.username}
+- Heure du match: {match_time_str}
+- Règles du match: {match_rules}
 
-Make sure to be ready for the match. Best of luck!
+Assurez-vous d'être prêt pour le match. Nous vous souhaitons bonne chance !
 
-Best regards,
-Toornoi.com Team
+
+Cordialement,
+L'équipe de Toornoi.com
+
 """
-                send_mail(subject, email_message_p1, settings.DEFAULT_FROM_EMAIL, [match.player_1.email])
+                send_mail(subject, email_message_p1,"contact@toornoi.com", [match.player_1.email])
                 
-                email_message_p2 = f"""Dear {match.player_2.username},
+                email_message_p2 = f"""Cher {match.player_2.username},
 
-The tournament pools have been created! Your match is scheduled as follows:
+Les poules du tournoi ont été créées ! Votre match est programmé comme suit:
 
-- Opponent: {match.player_1.username}
-- Match Time: {match_time_str}
-- Match Rules: {match_rules}
+- Adversaire: {match.player_1.username}
+- Heure du match: {match_time_str}
+- Règles du match: {match_rules}
 
-Make sure to be ready for the match. Best of luck!
+Assurez-vous d'être prêt pour le match. Nous vous souhaitons bonne chance !
 
-Best regards,
-Toornoi.com Team
+Cordialement,
+L'équipe de Toornoi.com
 """
-                send_mail(subject, email_message_p2, settings.DEFAULT_FROM_EMAIL, [match.player_2.email])
-        
-        # (Optional: send push notifications as before)
-        headers = self.get_success_headers(serializer.data)
-        return Response({
-            "message": f"{total_participants} participants are included in this pool, and the pool number is {data['pool_number']}.",
+                send_mail(subject, email_message_p2,"contact@toornoi.com", [match.player_2.email])
+                
+            headers = self.get_success_headers(serializer.data)
+            return Response({
+            "message": f"{total_participants} Les participants sont inclus dans cette poule , et le numéro de poule est.{data['pool_number']}.",
             "pool": serializer.data,
         }, status=status.HTTP_201_CREATED, headers=headers)
-    
-#     @action(detail=True, methods=['post'], url_path='finalize-matches')
-#     def finalize_matches(self, request, pk=None):
-#         """
-#         Finalize all pending matches in this pool.
-#         For each match:
-#          - Finalize the match (compare scores, etc.)
-#          - Send a winning email to the winner and a losing email to the loser.
-#         If this is the final pool ("Final"), after finalizing, send a winner announcement email.
-#         """
-#         pool = get_object_or_404(Pool, pk=pk)
-#         if timezone.now() < pool.end_date:
-#             return Response({"error": "Pool deadline has not yet passed."}, status=status.HTTP_400_BAD_REQUEST)
         
-#         pending_matches = pool.matches.filter(status="Pending")
-#         results = []
-#         for match in pending_matches:
-#             res = finalize_match(match)
-#             results.append({"match_id": match.id, "result": res})
-#             if match.winner:
-#                 if match.winner == match.player_1:
-#                     winner_player = match.player_1
-#                     loser_player = match.player_2
-#                 else:
-#                     winner_player = match.player_2
-#                     loser_player = match.player_1
-                
-#                 # For regular pools, send win/loss emails.
-#                 if pool.pool_number != "Final":
-#                     win_subject = "Congratulations! You Won Your Match"
-#                     win_message = f"""Dear {winner_player.username},
-
-# Great news! You have won your match against {loser_player.username}.
-# You have now qualified for the next round.
-
-# Keep up the momentum and best of luck in the next round!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#                     lose_subject = f"Thank You for Competing in {match.tournament.tournament_name}"
-#                     lose_message = f"""Dear {loser_player.username},
-
-# Your tournament journey has come to an end. You played well, but unfortunately, you lost your match against {winner_player.username}.
-# We appreciate your participation and look forward to seeing you in future tournaments.
-# Keep training and come back stronger!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#                     send_mail(win_subject, win_message, settings.DEFAULT_FROM_EMAIL, [winner_player.email])
-#                     send_mail(lose_subject, lose_message, settings.DEFAULT_FROM_EMAIL, [loser_player.email])
-#                 else:
-#                     # For the final pool, after finalizing the match, send a winner announcement email.
-#                     announcement_subject = f"Congratulations! You Are the Champion of {match.tournament.tournament_name}"
-#                     announcement_message = f"""Dear {winner_player.username},
-
-# You did it! You are the champion of {match.tournament.tournament_name}.
-# Prize: €{match.tournament.positions_1}
-
-# We will contact you shortly for prize distribution details.
-# Thank you for your incredible performance!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#                     send_mail(announcement_subject, announcement_message, settings.DEFAULT_FROM_EMAIL, [winner_player.email])
-#         # If final pool, update tournament status to Completed.
-#         if pool.pool_number == "Final":
-#             tournament = pool.tournament
-#             tournament.status = "Completed"
-#             tournament.save()
+                #   Also send push notifications (if users are subscribed) as before.
+#             match_players = set()
+#             for match in pool.matches.all():
+#                 match_players.add(str(match.player_1.id))
+#                 match_players.add(str(match.player_2.id))
+#             notif_title = "New Matches Scheduled"
+#             notif_message = f"New matches for Tournament {tournament.tournament_name} have been scheduled on {pool.start_date.strftime('%Y-%m-%d %H:%M')}."
+#             push_response = send_push_notification(list(match_players), notif_title, notif_message, additional_data={"pool_id": pool.id})
         
+#         headers = self.get_success_headers(serializer.data)
 #         return Response({
-#             "message": "All pending matches finalized and notifications sent.",
-#             "results": results
-#         }, status=status.HTTP_200_OK)
+#  "message": f"{total_participants} Les participants sont inclus dans cette poule , et le numéro de poule est.{data['pool_number']}.",
+#             "pool": serializer.data,
+#             "push_response": push_response  # For debugging purposes.
+#         }, status=status.HTTP_201_CREATED, headers=headers)
+        # # (Optional: send push notifications as before)
+      
+    
 
     @action(detail=True, methods=['post'], url_path='finalize-matches')
     def finalize_matches(self, request, pk=None):
@@ -574,10 +486,11 @@ Toornoi.com Team
         then update the tournament status to "Completed".
         """
         pool = get_object_or_404(Pool, pk=pk)
+        tournament = pool.tournament  # Define it at the beginning
         if timezone.now() < pool.end_date:
-            return Response({"error": "Pool deadline has not yet passed."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "La date limite du tour n’est pas encore dépassée."}, status=status.HTTP_400_BAD_REQUEST)
         
-        pending_matches = pool.matches.filter(status="Pending")
+        pending_matches = pool.matches.filter(status="En attente")
         results = []
         for match in pending_matches:
             res = finalize_match(match)
@@ -589,31 +502,60 @@ Toornoi.com Team
                 else:
                     winner_player = match.player_2
                     loser_player = match.player_1
+                    
+                match_time_str=match.date.strftime("%Y-%m-%d %H:%M")  # Format match time
                 
-                if pool.pool_number != "Final":
-                    win_subject = "Congratulations! You Won Your Match"
-                    win_message = f"""Dear {winner_player.username},
+                # Generate match link
+                match_link = f"https://toornoi.com/my-account/match/{match.id}/"
+                # ** Store Winner Notification**
+                Notification.objects.create(
+                    user=winner_player,
+                    title="🎉 Victoire !",
+                    message=f"Félicitations {winner_player.username} ! Vous avez remporté votre match contre {loser_player.username} "
+                        f"le {match_time_str}. 🎊 {match_link}Voir les détails du match."
+                )    
+                 # ** Store Loser Notification**
+                Notification.objects.create(
+                    user=loser_player,
+                    title="⚔️ Fin du tournoi",
+                    message=f"Cher {loser_player.username}, malheureusement, vous avez perdu contre {winner_player.username} "
+                       f"le {match_time_str}. Merci pour votre participation ! "
+                       f"{match_link}Voir les détails du match."
+                )
+             
 
-Great news! You have won your match against {loser_player.username}.
-You have now qualified for the next round.
 
-Keep up the momentum and best of luck in the next round!
 
-Best regards,
-Toornoi.com Team
+                    
+                
+                if pool.pool_number != "Finale":
+                    win_subject = "Félicitations ! Vous avez gagné votre match"
+                    win_message = f"""Cher {winner_player.username},
+
+Excellente nouvelle ! Vous avez gagné votre match contre {loser_player.username}.
+Vous êtes maintenant qualifié pour le prochain tour.
+
+Continuez sur votre lancée et bonne chance pour le prochain tour !
+
+
+Cordialement,
+L'équipe de Toornoi.com
+
 """
-                    lose_subject = f"Thank You for Competing in {match.tournament.tournament_name}"
-                    lose_message = f"""Dear {loser_player.username},
+                    lose_subject = f"Merci d'avoir participé à{match.tournament.tournament_name}"
+                    lose_message = f"""Cher {loser_player.username},
 
-Your tournament journey has come to an end. You played well, but unfortunately, you lost your match against {winner_player.username}.
-We appreciate your participation and look forward to seeing you in future tournaments.
-Keep training and come back stronger!
+Votre parcours dans le tournoi est terminé. Vous avez bien joué, mais malheureusement, vous avez perdu votre match contre  {winner_player.username}.
+Nous apprécions votre participation et nous nous réjouissons de vous revoir dans les prochains tournois.
+Continuez à vous entraîner et revenez plus fort !
 
-Best regards,
-Toornoi.com Team
+
+Cordialement,
+L'équipe de Toornoi.com
+
 """
-                    send_mail(win_subject, win_message, settings.DEFAULT_FROM_EMAIL, [winner_player.email])
-                    send_mail(lose_subject, lose_message, settings.DEFAULT_FROM_EMAIL, [loser_player.email])
+                    send_mail(win_subject, win_message,"contact@toornoi.com",  [winner_player.email])
+                    send_mail(lose_subject, lose_message,"contact@toornoi.com",  [loser_player.email])
                 else:
                     # For the final pool, prize assignment and champion announcement.
                     # Assume there's one final match.
@@ -630,231 +572,61 @@ Toornoi.com Team
                     from .models import Prize
                     Prize.objects.create(
                         tournament=pool.tournament,
-                        position="Champion",
+                        position="Championne",
                         prize_value=pool.tournament.positions_1,
                         winner=champion
                     )
                     Prize.objects.create(
                         tournament=pool.tournament,
-                        position="second winner",
+                        position="deuxième gagnant",
                         prize_value=pool.tournament.positions_2,
                         winner=runner_up
                     )
-                    # if third_place:
-                    #     Prize.objects.create(
-                    #         tournament=pool.tournament,
-                    #         position="Third Place",
-                    #         prize_value=pool.tournament.positions_3,
-                    #         winner=third_place
-                    #     )
-                    announcement_subject = f"Congratulations! You Are the Champion of {pool.tournament.tournament_name}"
-                    announcement_message = f"""Dear {champion.username},
+              
+                     # Generate tournament link
+                    # tournament_link = f"http://127.0.0.1:8000/tournaments/{tournament.id}/"
+                    tournament_link = f"https://toornoi.com/my-account/my-tournaments/{tournament.id}/"
 
-You did it! You are the champion of {pool.tournament.tournament_name}.
-Prize: €{pool.tournament.positions_1}
+                    # **Store Tournament Winner Notification**
+                    Notification.objects.create(
+                        user=winner_player,
+                        title="🏆 Champion du tournoi !",
+                     message=f"Félicitations {winner_player.username} ! Vous êtes le champion de {tournament.tournament_name}. "
+                             f"Vous remportez un prix de €{tournament.positions_1}. 🎉 "
+                                f"{tournament_link}Voir les détails du tournoi."
+                    )
+                    # **Store Tournament Loser Notification**
+                    Notification.objects.create(
+                        user=loser_player,
+                        title="🏁 Fin du tournoi",
+                        message=f"Cher {loser_player.username}, malheureusement, vous n'avez pas remporté le tournoi {tournament.tournament_name}. "
+                                 f"Merci pour votre participation et à bientôt pour un nouveau défi ! "
+                                f"{tournament_link}Voir les résultats du tournoi."
+                    )
 
-We will contact you shortly for prize distribution details.
-Thank you for your incredible performance!
+                
+                    announcement_subject = f"Félicitations ! Vous êtes le champion de {pool.tournament.tournament_name}"
+                    announcement_message = f"""Cher {champion.username},
 
-Best regards,
-Toornoi.com Team
+Vous avez réussi ! Vous êtes le champion de {pool.tournament.tournament_name}.
+Prix :  €{pool.tournament.positions_1}
+
+Nous vous contacterons prochainement pour vous communiquer les détails de la distribution du prix.
+Encore félicitations pour votre incroyable performance !
+
+Cordialement,
+L'équipe de Toornoi.com
 """
-                    send_mail(announcement_subject, announcement_message, settings.DEFAULT_FROM_EMAIL, [champion.email])
-        if pool.pool_number == "Final":
+                    send_mail(announcement_subject, announcement_message,"contact@toornoi.com",[champion.email])
+        if pool.pool_number == "Finale":
             tournament = pool.tournament
-            tournament.status = "Completed"
+            tournament.status = "Complété"
             tournament.save()
         
         return Response({
-            "message": "All pending matches finalized and notifications sent.",
+            "message": "Tous les matches en cours sont finalisés et les notifications sont envoyées.",
             "results": results
         }, status=status.HTTP_200_OK)
-
-# class PoolViewSet(viewsets.ModelViewSet):
-#     """
-#     Pool creation and management endpoint.
-#     - Creates new pools.
-#     - Generates matches.
-#     - If exactly 2 athletes remain, the pool is labeled "Final".
-#     - When final matches are finalized, sends win/loss email notifications.
-#     """
-#     queryset = Pool.objects.all()
-
-#     def get_serializer_class(self):
-#         if self.action in ['list', 'retrieve']:
-#             return DisplayPoolSerializer
-#         return PoolSerializer
-
-#     @action(detail=False, methods=['get'], url_path='next-pool-number')
-#     def next_pool_number(self, request):
-#         tournament_id = request.query_params.get('tournament')
-#         if not tournament_id:
-#             return Response({"error": "Tournament parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-#         tournament = get_object_or_404(Tournament, id=tournament_id)
-#         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
-#         if last_pool and last_pool.pool_number != "Final":
-#             next_pool_number = int(last_pool.pool_number) + 1
-#         else:
-#             next_pool_number = 1
-#         return Response({
-#             "tournament": tournament.id,
-#             "next_pool_number": next_pool_number
-#         })
-
-#     def create(self, request, *args, **kwargs):
-#         data = request.data.copy()
-#         tournament_id = data.get('tournament')
-#         if not tournament_id:
-#             return Response({"error": "Tournament is required."}, status=status.HTTP_400_BAD_REQUEST)
-#         tournament = get_object_or_404(Tournament, id=tournament_id)
-        
-#         # Calculate next pool number.
-#         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
-#         if last_pool and last_pool.pool_number != "Final":
-#             next_pool_number = int(last_pool.pool_number) + 1
-#         else:
-#             next_pool_number = 1
-
-#         # Determine athletes based on pool number.
-#         if next_pool_number == 1:
-#             registration_ids = TournamentRegistration.objects.filter(tournament=tournament).values_list('user', flat=True)
-#             athletes = list(User.objects.filter(id__in=registration_ids))
-#             total_participants = len(athletes)
-#         else:
-#             previous_pool = Pool.objects.filter(tournament=tournament, pool_number=last_pool.pool_number).first()
-#             if not previous_pool:
-#                 return Response({"error": "Previous pool not found."}, status=status.HTTP_400_BAD_REQUEST)
-#             previous_matches = Match.objects.filter(pool=previous_pool, status='Completed')
-#             athletes = [m.winner for m in previous_matches if m.winner]
-#             if previous_pool.result and isinstance(previous_pool.result, dict):
-#                 bye_ids = previous_pool.result.get("bye", [])
-#                 if bye_ids:
-#                     bye_users = list(User.objects.filter(id__in=bye_ids))
-#                     athletes.extend(bye_users)
-#             total_participants = len(athletes)
-#             if total_participants < 2:
-#                 return Response({"message": "Tournament is complete; no more users available to create the next pool."}, status=status.HTTP_200_OK)
-        
-#         # If exactly 2 athletes remain, treat this pool as the final pool.
-#         if total_participants == 2:
-#             data['pool_number'] = "Final"
-#         else:
-#             data['pool_number'] = next_pool_number
-        
-#         data['total_participants'] = total_participants
-#         serializer = self.get_serializer(data=data)
-#         serializer.is_valid(raise_exception=True)
-#         pool = serializer.save()
-
-#         if total_participants >= 2:
-#             generate_matches(athletes, pool)
-
-#         # Send email notifications to each athlete for each match in this pool.
-#         for match in pool.matches.all():
-#             match_time_str = match.date.strftime("%Y-%m-%d %H:%M")
-#             # Use tournament rules if available.
-#             match_rules = match.tournament.rules_and_regulations if hasattr(match.tournament, "rules_and_regulations") else "Standard rules apply"
-#             subject = "Tournament Pools Created – Get Ready for Your Match!"
-#             # Email to player 1.
-#             email_message_p1 = f"""Dear {match.player_1.username},
-
-# The tournament pools have been created! Your match is scheduled as follows:
-
-# - Opponent: {match.player_2.username}
-# - Match Time: {match_time_str}
-# - Match Rules: {match_rules}
-
-# Make sure to be ready for the match. Best of luck!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#             send_mail(subject, email_message_p1, settings.DEFAULT_FROM_EMAIL, [match.player_1.email])
-#             # Email to player 2.
-#             email_message_p2 = f"""Dear {match.player_2.username},
-
-# The tournament pools have been created! Your match is scheduled as follows:
-
-# - Opponent: {match.player_1.username}
-# - Match Time: {match_time_str}
-# - Match Rules: {match_rules}
-
-# Make sure to be ready for the match. Best of luck!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#             send_mail(subject, email_message_p2, settings.DEFAULT_FROM_EMAIL, [match.player_2.email])
-        
-#         # (Optional: send push notifications here as well.)
-#         headers = self.get_success_headers(serializer.data)
-#         return Response({
-#             "message": f"{total_participants} participants are included in this pool, and the pool number is {data['pool_number']}.",
-#             "pool": serializer.data,
-#         }, status=status.HTTP_201_CREATED, headers=headers)
-
-#     @action(detail=True, methods=['post'], url_path='finalize-matches')
-#     def finalize_matches(self, request, pk=None):
-#         """
-#         Finalize all pending matches in this pool.
-#         For each match:
-#          - Compare scores and determine the winner.
-#          - Send a winning email to the winner.
-#          - Send a losing email to the loser.
-#         If this is the final pool (pool_number == "Final"), update the tournament status to "Completed".
-#         """
-#         pool = get_object_or_404(Pool, pk=pk)
-#         if timezone.now() < pool.end_date:
-#             return Response({"error": "Pool deadline has not yet passed."}, status=status.HTTP_400_BAD_REQUEST)
-#         pending_matches = pool.matches.filter(status="Pending")
-#         results = []
-#         for match in pending_matches:
-#             res = finalize_match(match)
-#             results.append({"match_id": match.id, "result": res})
-#             # Determine winner and loser.
-#             if match.winner:
-#                 if match.winner == match.player_1:
-#                     winner_player = match.player_1
-#                     loser_player = match.player_2
-#                 else:
-#                     winner_player = match.player_2
-#                     loser_player = match.player_1
-#                 # Winning email.
-#                 win_subject = "Congratulations! You Won Your Match"
-#                 win_message = f"""Dear {winner_player.username},
-
-# Great news! You have won your match against {loser_player.username}.
-# You have now qualified for the next round.
-
-# Keep up the momentum and best of luck in the next round!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#                 # Losing email.
-#                 lose_subject = f"Thank You for Competing in {match.tournament.tournament_name}"
-#                 lose_message = f"""Dear {loser_player.username},
-
-# Your tournament journey has come to an end. You played well, but unfortunately, you lost your match against {winner_player.username}.
-# We appreciate your participation and look forward to seeing you in future tournaments.
-# Keep training and come back stronger!
-
-# Best regards,
-# Toornoi.com Team
-# """
-#                 send_mail(win_subject, win_message, settings.DEFAULT_FROM_EMAIL, [winner_player.email])
-#                 send_mail(lose_subject, lose_message, settings.DEFAULT_FROM_EMAIL, [loser_player.email])
-        
-#         # If this is the final pool, update the tournament status to "Completed".
-#         if pool.pool_number == "Final":
-#             tournament = pool.tournament
-#             tournament.status = "Completed"
-#             tournament.save()
-        
-#         return Response({
-#             "message": "All pending matches finalized and notifications sent.",
-#             "results": results
-#         }, status=status.HTTP_200_OK)
 
 
 
@@ -1044,128 +816,12 @@ Toornoi.com Team
 
 
 
-
-
-
-
-
-# User = get_user_model()
-
-# def random_datetime(start, end):
-#     delta = end - start
-#     int_delta = delta.days * 24 * 3600 + delta.seconds
-#     random_second = random.randrange(int_delta)
-#     return start + datetime.timedelta(seconds=random_second)
-
-# def generate_matches(athletes, pool):
-#     random.shuffle(athletes)
-#     matches = []
-#     while len(athletes) >= 2:
-#         player_1 = athletes.pop()
-#         player_2 = athletes.pop()
-#         match_date = random_datetime(pool.start_date, pool.end_date)
-#         match = Match.objects.create(
-#             tournament=pool.tournament,
-#             pool=pool,
-#             player_1=player_1,
-#             player_2=player_2,
-#             date=match_date,
-#             status='Pending',
-#             result={"player_1_score": None, "player_2_score": None, "submitted_by": {}}
-#         )
-#         matches.append(match)
-#     if athletes:
-#         bye_player = athletes.pop()
-#         if not isinstance(pool.result, dict):
-#             pool.result = {}
-#         pool.result.setdefault("bye", [])
-#         pool.result["bye"].append(bye_player.id)
-#         pool.save()
-#     return matches
-
-# class PoolViewSet(viewsets.ModelViewSet):
-#     queryset = Pool.objects.all()
-
-#     def get_serializer_class(self):
-#         if self.action == 'list':
-#             return DisplayPoolSerializer
-#         return PoolSerializer
-
-#     @action(detail=False, methods=['get'], url_path='next-pool-number')
-#     def next_pool_number(self, request):
-#         tournament_id = request.query_params.get('tournament')
-#         if not tournament_id:
-#             return Response({"error": "Tournament parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-#         try:
-#             tournament = Tournament.objects.get(id=tournament_id)
-#         except Tournament.DoesNotExist:
-#             return Response({"error": "Tournament not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-#         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
-#         next_pool_number = last_pool.pool_number + 1 if last_pool else 1
-
-#         return Response({
-#             "tournament": tournament.id,
-#             "next_pool_number": next_pool_number
-#         })
-
-#     def create(self, request, *args, **kwargs):
-#         data = request.data.copy()
-#         tournament_id = data.get('tournament')
-#         if not tournament_id:
-#             return Response({"error": "Tournament is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-#         try:
-#             tournament = Tournament.objects.get(id=tournament_id)
-#         except Tournament.DoesNotExist:
-#             return Response({"error": "Tournament not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-#         last_pool = Pool.objects.filter(tournament=tournament).order_by('-pool_number').first()
-#         next_pool_number = last_pool.pool_number + 1 if last_pool else 1
-#         data['pool_number'] = next_pool_number
-
-#         if next_pool_number == 1:
-#             registration_ids = TournamentRegistration.objects.filter(tournament=tournament).values_list('user', flat=True)
-#             athletes = list(User.objects.filter(id__in=registration_ids))
-#             total_participants = len(athletes)
-#         else:
-#             previous_pool = Pool.objects.filter(tournament=tournament, pool_number=next_pool_number - 1).first()
-#             if not previous_pool:
-#                 return Response({"error": "Previous pool not found."}, status=status.HTTP_400_BAD_REQUEST)
-#             previous_matches = Match.objects.filter(pool=previous_pool, status='Completed')
-#             athletes = [match.winner for match in previous_matches if match.winner]
-#             if previous_pool.result and isinstance(previous_pool.result, dict):
-#                 bye_ids = previous_pool.result.get("bye", [])
-#                 if bye_ids:
-#                     bye_users = list(User.objects.filter(id__in=bye_ids))
-#                     athletes.extend(bye_users)
-#             total_participants = len(athletes)
-#             if total_participants < 2:
-#                 return Response({"message": "Tournament is complete; no more users available to create the next pool."}, status=status.HTTP_200_OK)
-        
-#         # Pass total_participants in the data so it gets saved in the model.
-#         data['total_participants'] = total_participants
-
-#         serializer = self.get_serializer(data=data)
-#         serializer.is_valid(raise_exception=True)
-#         # Save the pool with the provided total_participants value.
-#         pool = serializer.save()
-
-#         if total_participants >= 2:
-#             generate_matches(athletes, pool)
-
-#         headers = self.get_success_headers(serializer.data)
-#         return Response({
-#             "message": f"{total_participants} participants are included in this pool, and the pool number is {next_pool_number}.",
-#             "pool": serializer.data
-#         }, status=status.HTTP_201_CREATED, headers=headers)
-
-
-
 # for Atheles show  match listing   and submit result on it 
 class UserMatchesViewSet(viewsets.ReadOnlyModelViewSet):  # Use ReadOnlyModelViewSet
     queryset = Match.objects.all()
     serializer_class = DisplayMatchSerializer
+    permission_classes = [IsAuthenticated]
+
     
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -1192,16 +848,16 @@ class UserMatchesViewSet(viewsets.ReadOnlyModelViewSet):  # Use ReadOnlyModelVie
         try:
             match = Match.objects.get(pk=pk)
         except Match.DoesNotExist:
-            return Response({"error": "Match not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Correspondance non trouvée"}, status=status.HTTP_404_NOT_FOUND)
 
         # Ensure the user is a participant in the match.
         if user not in [match.player_1, match.player_2]:
-            return Response({"error": "You are not authorized to update this match"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Vous n'êtes pas autorisé à mettre à jour cette correspondance"}, status=status.HTTP_403_FORBIDDEN)
 
         # Get the score from the request data.
         score = request.data.get('score')
         if score is None:
-            return Response({"error": "Score is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Le score est requis"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get the screenshot file if provided.
         screenshot = request.FILES.get('screenshot')
@@ -1216,7 +872,7 @@ class UserMatchesViewSet(viewsets.ReadOnlyModelViewSet):  # Use ReadOnlyModelVie
         # Process based on which player is submitting.
         if user == match.player_1:
             if match.result["player_1_score"] is not None:
-                return Response({"error": "You have already submitted your score"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Vous avez déjà soumis votre score"}, status=status.HTTP_400_BAD_REQUEST)
             match.result["player_1_score"] = score
             match.result["submitted_by"]["player_1"] = user.username
 
@@ -1231,7 +887,7 @@ class UserMatchesViewSet(viewsets.ReadOnlyModelViewSet):  # Use ReadOnlyModelVie
 
         elif user == match.player_2:
             if match.result["player_2_score"] is not None:
-                return Response({"error": "You have already submitted your score"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Vous avez déjà soumis votre score"}, status=status.HTTP_400_BAD_REQUEST)
             match.result["player_2_score"] = score
             match.result["submitted_by"]["player_2"] = user.username
 
@@ -1272,19 +928,7 @@ class UserTournamentsViewSet(viewsets.ViewSet):
         tournament = get_object_or_404(Tournament, pk=pk)
         serializer = MyTournamentUsersSerializer(tournament)
         return Response(serializer.data, status=200)
-# class UserTournamentsViewSet(viewsets.ViewSet):
-#     permission_classes = [permissions.IsAuthenticated]
 
-#     @action(detail=False, methods=['get'])
-#     def my_tournaments(self, request):
-#         """
-#         Get a list of tournaments the user is registered for.
-#         """
-#         user = request.user
-#         tournaments = Tournament.objects.filter(registrations__user=user).distinct()
-
-#         serializer = MyTournamentUsersSerializer(tournaments, many=True)
-#         return Response(serializer.data, status=200)
 
    
     
@@ -1299,6 +943,9 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 class TournamentsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tournament.objects.all()
     serializer_class = GetTournamentSerializer
+    # permission_classes = [permissions.IsAuthenticated]
+   
+
 
     def get_serializer_context(self):
         """Pass request context to serializer to check user registration and payment status."""
@@ -1311,10 +958,16 @@ class TournamentsViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             tournament = self.get_object()
             user = request.user
-
+            
+             # **Check if the tournament is full**
+            current_registrations = TournamentRegistration.objects.filter(tournament=tournament).count()
+            if current_registrations >= tournament.slots:
+                return Response({"error": "Ce tournoi est complet. Il n'y a plus de places disponibles."}, status=400) 
+             
+    
             # Check if user is already registered
             if TournamentRegistration.objects.filter(user=user, tournament=tournament).exists():
-                return Response({"error": "You are already registered for this tournament."}, status=400)
+                return Response({"error": "Vous êtes déjà inscrit à ce tournoi."}, status=400)
 
             # Create Stripe PaymentIntent
             amount = int(float(tournament.registration_fee) * 100)  # Convert to cents
@@ -1331,7 +984,10 @@ class TournamentsViewSet(viewsets.ReadOnlyModelViewSet):
 
             # Determine payment status
             payment_status = "Paid" if intent.status == "succeeded" else "Pending"
+           
 
+            # **Register user and create notification in a single transaction**
+            # with transaction.atomic():
             # Register user
             registration = TournamentRegistration.objects.create(
                 user=user,
@@ -1345,27 +1001,33 @@ class TournamentsViewSet(viewsets.ReadOnlyModelViewSet):
             # **Send Confirmation Email if Payment is Successful**
             if payment_status == "Paid":
                 send_mail(
-                    subject=f"Payment Received for {tournament.tournament_name}",
-                    message=f"Dear {user.username},\n\n"
-                            f"We have received your tournament registration fee for {tournament.tournament_name}. Thank you for your payment!\n\n"
-                            f"- Amount Paid: {tournament.registration_fee} EUR\n"
-                            f"- Transaction ID: {intent.id}\n\n"
-                            f"You are now officially registered for the tournament. We will notify you when the pools are created.\n\n"
-                            f"Best regards, Toornoi.com  Team",
-                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    subject=f"Paiement reçu pour{tournament.tournament_name}",
+                    message=f"Cher {user.username},\n\n"
+                            f"Nous avons reçu les frais d'inscription au tournoi pour {tournament.tournament_name}. Thank you for your payment!\n\n"
+                            f"- Montant payé: {tournament.registration_fee} EUR\n"
+                            f"-  ID de la transaction: {intent.id}\n\n"
+                            f"Vous êtes maintenant officiellement inscrit au tournoi. Nous vous informerons lorsque les poules seront créées.\n\n"
+                            f"Meilleures salutations, l'équipe de Toornoi.com",
+                    from_email="contact@toornoi.com",
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
+                    # **Create Notification for Payment Success**
+                Notification.objects.create(
+                        user=user,
+                        title="Paiement reçu",
+                        message=f"Votre paiement de {tournament.registration_fee} EUR pour le tournoi '{tournament.tournament_name}' a été reçu avec succès. Vous êtes maintenant inscrit.",
+                    )
 
             return Response({
-                "message": "Tournament registration initiated.",
+                "message": "Enregistrement du tournoi initié.",
                 "payment_status": payment_status,
                 "payment_intent_id": intent.id,
                 "client_secret": intent.client_secret
             }, status=201)
 
         except Tournament.DoesNotExist:
-            return Response({"error": "Tournament not found."}, status=404)
+            return Response({"error": "Tournoi non trouvé."}, status=404)
 
         except stripe.error.StripeError as e:
             return Response({"error": str(e)}, status=400)
@@ -1397,7 +1059,7 @@ def stripe_webhook(request):
         # Handle the event
         if event["type"] == "payment_intent.succeeded":
             payment_intent = event["data"]["object"]
-            logger.info(f"PaymentIntent succeeded: {payment_intent['id']}")  # Log the PaymentIntent ID
+            logger.info(f"Paiement réussi : {payment_intent['id']}")  # Log the PaymentIntent ID
 
             try:
                 # Find the corresponding TournamentRegistration
@@ -1406,10 +1068,10 @@ def stripe_webhook(request):
                 )
                 registration.payment_status = "Paid"
                 registration.save()
-                logger.info(f"Updated registration for PaymentIntent: {payment_intent['id']}")
+                logger.info(f"Enregistrement mis à jour pour cette tentative de paiement: {payment_intent['id']}")
             except TournamentRegistration.DoesNotExist:
-                logger.error(f"Registration not found for PaymentIntent: {payment_intent['id']}")
-                return JsonResponse({"error": "Registration not found"}, status=404)
+                logger.error(f"Enregistrement non trouvé pour cette tentative de paiement: {payment_intent['id']}")
+                return JsonResponse({"error": "Enregistrement non trouvé"}, status=404)
 
         return JsonResponse({"status": "success"}, status=200)
 
@@ -1429,6 +1091,8 @@ class UsersMatchesViewSet(viewsets.ReadOnlyModelViewSet):
     (Win, Lose, or Pending) for each match.
     """
     serializer_class = UserMatchSerializer
+    permission_classes = [IsAuthenticated]
+
 
     def get_queryset(self):
         user = self.request.user
@@ -1488,37 +1152,62 @@ class ClaimViewSet(viewsets.ModelViewSet):
     """
     queryset = Claim.objects.all()
     serializer_class = ClaimSerializer
+    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+
 
     def perform_create(self, serializer):
         # Save the claim with the authenticated user.
         claim = serializer.save(user=self.request.user)
 
         # --- Email to Admins ---
-        admin_subject = f"New Claim Submitted: {claim.subject}"
+        admin_subject = f"Nouvelle réclamation soumise : {claim.subject}"
         admin_message = (
-            f"A new claim has been submitted by {claim.user.username}.\n\n"
-            f"Phone Number: {claim.phone_number}\n"
-            f"Subject: {claim.subject}\n"
-            f"Details: {claim.details}\n\n"
-            f"View the claim in the admin panel."
+            f"Une nouvelle réclamation a été soumise par {claim.user.username}.\n\n"
+            f"Numéro de téléphone: {claim.phone_number}\n"
+            f"Sujet: {claim.subject}\n"
+            f"Détails : {claim.details}\n\n"
+            f"Voir la réclamation dans le panneau d'administration."
         )
         admin_emails = list(User.objects.filter(is_superuser=True).values_list('email', flat=True))
         if admin_emails:
-            send_mail(admin_subject, admin_message, settings.EMAIL_HOST_USER, admin_emails)
+            send_mail(admin_subject, admin_message, "contact@toornoi.com", admin_emails)
 
         # --- Confirmation Email to User ---
-        support_email = admin_emails[0] if admin_emails else "support@example.com"
-        user_subject = "Your Claim Request Has Been Received"
-        user_message = f"""Dear {claim.user.username},
+        support_email = admin_emails[0] if admin_emails else "contact@toornoi.com"
+        user_subject = "Nous avons reçu votre demande de réclamation"
+        user_message = f"""Cher {claim.user.username},
 
-We have received your claim regarding "{claim.subject}". Our team will review your request and respond as soon as possible.
+Nous avons bien reçu votre demande concernant "{claim.subject}". Notre équipe examinera votre demande et vous répondra dès que possible.
 
-For urgent inquiries, please contact support at {support_email}.
 
-Best regards,
-toornoi.com Team
+Pour les demandes urgentes, veuillez contacter le service d'assistance à l'adresse suivante {support_email}.
+
+Cordialement,
+L'équipe de toornoi.com
+
 """
-        send_mail(user_subject, user_message, settings.DEFAULT_FROM_EMAIL, [claim.user.email])
+        send_mail(user_subject, user_message,"contact@toornoi.com", [claim.user.email])
+        
+         # --- Create Notification for the User ---
+        Notification.objects.create(
+            user=claim.user,
+            title="📢 Réclamation reçue",
+            message=f"Votre réclamation sur \"{claim.subject}\" a été soumise avec succès. Nous la traiterons bientôt."
+        )
+        
+        
+        # Get the first superuser (admin)
+        admin_user = User.objects.filter(is_superuser=True).first()
+
+        if admin_user:  # Ensure an admin exists before creating the notification
+            Notification.objects.create(
+                user=admin_user,  # ✅ Use the User instance directly
+                title="🛠 Nouvelle réclamation",
+                message=f"{claim.user.username} a soumis une nouvelle réclamation : \"{claim.subject}\"."
+            )
+
+        
 
     @action(detail=True, methods=['post'], url_path='update-claim-status')
     def update_claim_status(self, request, pk=None):
@@ -1529,83 +1218,41 @@ toornoi.com Team
             claim = self.get_object()
 
             # Check if claim is already resolved
-            if claim.claim_status == "Resolved":
-                return Response({"message": "Claim is already resolved."}, status=status.HTTP_400_BAD_REQUEST)
+            if claim.claim_status == "Résolu":
+                return Response({"message": "La réclamation est déjà résolue."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Update claim status
-            claim.claim_status = "Resolved"
+            claim.claim_status = "Résolu"
             claim.save()
 
             # Send resolution email to user
-            subject = "Claim Resolution Update"
-            message = f"""Dear {claim.user.username},
+            subject = "Mise à jour de la résolution de la réclamation"
+            message = f"""Cher {claim.user.username},
 
-Your claim regarding "{claim.subject}" has been reviewed.
+Votre réclamation concernant "{claim.subject}"  a été examinée.
 
-Resolution: {claim.details}.
+Résolution: {claim.details}.
 
-If you have any further concerns, feel free to reach out.
+Si vous avez d'autres questions, n'hésitez pas à nous contacter.
 
-Best regards,  
-Toornoi.com Team
+Cordialement,  
+L'équipe de Toornoi.com
+
 """
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [claim.user.email])
+            send_mail(subject, message,"contact@toornoi.com", [claim.user.email])
+            
+             # --- Create a notification for the user ---
+            Notification.objects.create(
+                user=claim.user,
+                title="✅ Réclamation Résolue",
+                message=f"Votre réclamation sur \"{claim.subject}\" a été résolue. Consultez votre e-mail pour plus de détails."
+            )
 
-            return Response({"message": "Claim status updated and email sent successfully."}, status=status.HTTP_200_OK)
+            return Response({"message": "L'état de la réclamation a été mis à jour et l'e-mail a été envoyé avec succès."}, status=status.HTTP_200_OK)
 
         except Claim.DoesNotExist:
-            return Response({"error": "Claim not found."}, status=status.HTTP_404_NOT_FOUND)
-# class ClaimViewSet(viewsets.ModelViewSet):
-#     """
-#     API endpoint that allows authenticated users to submit claims.
-#     When a claim is submitted, an email is sent to admin users and
-#     a confirmation email is sent to the athlete.
-#     """
-#     queryset = Claim.objects.all()
-#     serializer_class = ClaimSerializer
-#     # permission_classes = [IsAuthenticated]  # Uncomment if using authentication
-
-#     def perform_create(self, serializer):
-#         # Save the claim with the authenticated user.
-#         claim = serializer.save(user=self.request.user)
+            return Response({"error": "Réclamation non trouvée."}, status=status.HTTP_404_NOT_FOUND)
         
-#         # --- Email to Admins ---
-#         admin_subject = f"New Claim Submitted: {claim.subject}"
-#         admin_message = (
-#             f"A new claim has been submitted by {claim.user.username}.\n\n"
-#             f"Phone Number: {claim.phone_number}\n"
-#             f"Subject: {claim.subject}\n"
-#             f"Details: {claim.details}\n\n"
-#             f"View the claim in the admin panel."
-#         )
-#         admin_emails = list(User.objects.filter(is_superuser=True).values_list('email', flat=True))
-#         if admin_emails:
-#             try:
-#                 send_mail(admin_subject, admin_message, settings.EMAIL_HOST_USER, admin_emails)
-#                 logger.info("Email sent successfully to admin emails: %s", admin_emails)
-#             except Exception as e:
-#                 logger.error("Error sending email to admin: %s", e)
-#         else:
-#             logger.warning("No admin emails found to send claim notification.")
-        
-#         # --- Confirmation Email to the Claim Submitter ---
-#         # Use the first admin email as the support contact if available.
-#         support_email = admin_emails[0] if admin_emails else "support@example.com"
-#         user_subject = "Your Claim Request Has Been Received"
-#         user_message = f"""Dear {claim.user.username},
-
-# We have received your claim regarding "{claim.subject}". Our team will review your request and respond as soon as possible.
-
-# For urgent inquiries, please contact support at {support_email}.
-
-# Best regards,
-# Toornoi.com Team
-# """
-#         try:
-#             send_mail(user_subject, user_message, settings.DEFAULT_FROM_EMAIL, [claim.user.email])
-#             logger.info("Confirmation email sent successfully to user: %s", claim.user.email)
-#         except Exception as e:
-#             logger.error("Error sending confirmation email to user: %s", e)
 
             
 # ViewSet for chat messages for a specific match  
@@ -1615,6 +1262,9 @@ from rest_framework.permissions import IsAuthenticated
 class MatchChatViewSet(viewsets.ModelViewSet):
     serializer_class = MatchChatSerializer
     permission_classes = [IsAuthenticated]
+    
+  
+    
 
     def get_queryset(self):
         # Retrieve the match using the URL parameter.
@@ -1622,7 +1272,7 @@ class MatchChatViewSet(viewsets.ModelViewSet):
         match = get_object_or_404(Match, id=match_id)
         # Only allow access if the requesting user is one of the two players.
         if self.request.user not in [match.player_1, match.player_2]:
-            raise PermissionDenied("You are not authorized to view this match's chats.")
+            raise PermissionDenied("Vous n'êtes pas autorisé à voir les chats de ce match.")
         return MatchChat.objects.filter(match=match).order_by('timestamp')
 
     def perform_create(self, serializer):
@@ -1630,20 +1280,47 @@ class MatchChatViewSet(viewsets.ModelViewSet):
         match = get_object_or_404(Match, id=match_id)
         # Only allow message creation if the request user is a participant in the match.
         if self.request.user not in [match.player_1, match.player_2]:
-            raise PermissionDenied("You are not authorized to send messages in this match.")
+            raise PermissionDenied("Vous n'êtes pas autorisé à envoyer des messages dans ce match.")
         message_instance = serializer.save(match=match, sender=self.request.user)
         
         # Optionally, notify the other participant.
         # Determine the "other" user:
         other_user = match.player_1 if self.request.user != match.player_1 else match.player_2
-        # Call your push notification service here to send the message to other_user.
-        # For example:
-        # send_push_notification(other_user, message_instance.message)          
+        
+          # Create a notification for the recipient
+        Notification.objects.create(
+        user=other_user,
+        title="📩 Nouveau message",
+        message=f"Vous avez reçu un nouveau message de {self.request.user.username}."
+    )
+       
+       
+        # Mark all messages in a match as read
+    @action(detail=False, methods=['post'], url_path='mark_as_read')
+    def mark_as_read(self, request, match_pk=None):
+        """Marks only the other user's messages as read."""
+        match = get_object_or_404(Match, id=match_pk)
+
+        # Ensure the user is a participant in the match
+        if request.user not in [match.player_1, match.player_2]:
+         return Response({"error": "Vous n'êtes pas un participant à ce match."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Use `exclude()` instead of an invalid '__ne' lookup
+        updated_count = MatchChat.objects.filter(
+        match=match, 
+        is_read=False
+        ).exclude(sender=request.user).update(is_read=True)
+
+        return Response({"message": f"{updated_count} messages marqués comme lus."}, status=status.HTTP_200_OK)
+
+          
+        
         
         
         
  # For admin panel show  total number of  claim    
 class TotalclaimViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     def list(self, request):
         # Exclude the first user by ID and count the rest
         total_claim = Claim.objects.all().count()
@@ -1651,10 +1328,24 @@ class TotalclaimViewSet(viewsets.ViewSet):
         # Return the total number of users as a response
         return Response({"total_claim": total_claim})     
   
+ # for get user dashboard  get user claim list  
+class UserclaimViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint that returns only the claims of the authenticated user.
+    """
+    serializer_class = ClaimSerializer
+    permission_classes = [IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]  # Ensures only logged-in users can access
+
+    def get_queryset(self):
+        """
+        Return only the claims of the currently authenticated user.
+        """
+        return Claim.objects.filter(user=self.request.user)  # Assuming Claim model has a ForeignKey to User
   
 #total number of tournaments a user has participated  in user profile list  
 class UserTournamentCountView(APIView):
-    
+    permission_classes = [IsAuthenticated] 
     def get(self, request, format=None):
         # Count distinct tournaments for which the logged-in user is registered.
         total=TournamentRegistration.objects.filter(user=request.user).values('tournament').distinct().count()
@@ -1671,8 +1362,8 @@ class UserTournamentResultsView(APIView):
     A tournament is considered complete if its final pool (the one with the highest pool_number)
     contains at least one Completed match. The winner of that final match is considered the tournament winner.
     """
+    # permission_classes = [IsAuthenticated]
     permission_classes = [IsAuthenticated]
-
     def get(self, request, format=None):
         user = request.user
         
@@ -1696,7 +1387,7 @@ class UserTournamentResultsView(APIView):
                 continue
             
             # Get the final match in that pool that is Completed.
-            final_match = Match.objects.filter(pool=final_pool, status="Completed").order_by('-id').first()
+            final_match = Match.objects.filter(pool=final_pool, status="Complété").order_by('-id').first()
             if not final_match:
                 continue
 
@@ -1727,7 +1418,20 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).order_by("-created_at")        
+        return Notification.objects.filter(user=self.request.user).order_by("-created_at") 
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """
+        Mark a notification as read when clicked.
+        """
+        try:
+            notification = self.get_object()
+            notification.is_read = True
+            notification.save()
+            return Response({"message": "Notification marquée comme lue."}, status=status.HTTP_200_OK)
+        except Notification.DoesNotExist:
+            return Response({"error": "Notification introuvable."}, status=status.HTTP_404_NOT_FOUND)       
     
     
     
@@ -1738,7 +1442,8 @@ class PublishedTournamentViewSet(viewsets.ReadOnlyModelViewSet):
     """
     # Optionally add permission_classes = [IsAuthenticated]
     queryset = Tournament.objects.filter(is_publish=True)
-    serializer_class = TournamentSerializer    
+    serializer_class = TournamentSerializer   
+    # permission_classes = [IsAuthenticated] 
     
     
   # on Contact as form  sends an email to admin user:  
@@ -1755,23 +1460,23 @@ class ContactFormAPIView(APIView):
             email = serializer.validated_data.get('email')
             message = serializer.validated_data.get('message')
             
-            subject = f"New Contact Form Submission from {name}"
+            subject = f"Nouveau formulaire de contact soumis par {name}"
             email_message = f"Name: {name}\nEmail: {email}\nMessage:\n{message}"
             
             # Retrieve admin email addresses.
             admin_emails = list(User.objects.filter(is_superuser=True).values_list('email', flat=True))
             if not admin_emails:
-                logger.warning("No admin users found to send contact form email.")
-                return Response({"error": "No admin available."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                logger.warning("Aucun administrateur n'a été trouvé pour envoyer l'email du formulaire de contact..")
+                return Response({"error": "Aucun administrateur disponible."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             try:
-                send_mail(subject, email_message, settings.DEFAULT_FROM_EMAIL, admin_emails)
-                logger.info("Contact form email sent to admin(s): %s", admin_emails)
+                send_mail(subject, email_message,"contact@toornoi.com", admin_emails)
+                logger.info("Formulaire de contact envoyé à l'administrateur(s): %s", admin_emails)
             except Exception as e:
-                logger.error("Error sending contact form email: %s", e)
-                return Response({"error": "Error sending email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                logger.error("Erreur d'envoi du formulaire de contact: %s", e)
+                return Response({"error": "Erreur lors de l'envoi de l'e-mail."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-            return Response({"message": "Your message has been sent successfully."}, status=status.HTTP_200_OK)
+            return Response({"message": "Votre message a été envoyé avec succès."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  
     
     
@@ -1779,6 +1484,8 @@ class ContactFormAPIView(APIView):
  
 class PrizeViewSet(viewsets.ModelViewSet):
     queryset = Prize.objects.all()
+    permission_classes = [IsAuthenticated]
+
 
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve']:
@@ -1794,20 +1501,29 @@ class PrizeViewSet(viewsets.ModelViewSet):
             prize = self.get_object()
 
             # Check if payment is already marked as paid
-            if prize.trans_payment_status == "paid":
-                return Response({"message": "Payment is already completed."}, status=status.HTTP_400_BAD_REQUEST)
+            if prize.trans_payment_status == "payé":
+                return Response({"message": "Le paiement est déjà effectué."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Update status to 'paid'
-            prize.trans_payment_status = "paid"
+            prize.trans_payment_status = "payé"
             prize.save()
 
             # Send email notification
             user_email = prize.winner.email  # Assuming 'winner' is a ForeignKey to User model
-            subject = "Your Prize Payment is Successful"
-            message = "Congratulations! Your prize payment has been successfully transferred to your account."
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user_email])
+            subject = "Le paiement de votre prix a été effectué avec succès"
+            message = "Nous vous félicitons ! Le paiement de votre prix a été transféré avec succès sur votre compte.."
+            send_mail(subject, message, "contact@toornoi.com", [user_email])
+            
+            
+              # **Create Notification**
+            Notification.objects.create(
+                user=prize.winner,
+                title="💰 Paiement du prix reçu !",
+                message=f"Félicitations {prize.winner.username} ! Votre paiement a été transféré avec succès sur votre compte. 🎉"
+            )
 
-            return Response({"message": "Payment status updated and email sent successfully."}, status=status.HTTP_200_OK)
+
+            return Response({"message": "L'état du paiement a été mis à jour et l'e-mail a été envoyé avec succès.."}, status=status.HTTP_200_OK)
 
         except Prize.DoesNotExist:
-            return Response({"error": "Prize not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Le prix n'a pas été trouvé.."}, status=status.HTTP_404_NOT_FOUND)

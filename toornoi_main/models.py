@@ -6,22 +6,30 @@ from decimal import Decimal
 
 # for admin panel 
 
+class category(models.Model):
+    name=models.CharField(max_length=255,null=True,)
+    def __str__(self):
+        return self.name
+class TournamentType(models.Model):
+    name=models.CharField(max_length=255,null=True,)
+    def __str__(self):
+        return self.name    
     
 class Tournament(models.Model):
     
     tournament_name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     cover_image = models.ImageField(upload_to='tournaments/cover_image/', null=True, blank=True)
-    category = models.CharField(max_length=255,null=True, blank=True)
+    category = models.ForeignKey(category,on_delete=models.CASCADE,null=True, blank=True)
     registration_deadline = models.DateTimeField(null=True, blank=True)
     registration_fee = models.CharField(max_length=100,blank=True,null=True)
     slots = models.IntegerField(null=True, blank=True)
-    status = models.CharField(max_length=255, default='Pending')
+    status = models.CharField(max_length=255, default='En attente')
     is_publish = models.BooleanField(default=False) 
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     time = models.TimeField(null=True, blank=True)
-    bracket_type = models.CharField(max_length=255,null=True, blank=True)
+    bracket_type = models.ForeignKey(TournamentType,on_delete=models.CASCADE,null=True, blank=True)
     eligibility_criteria = models.TextField(null=True, blank=True)
     country = models.CharField(max_length=255,null=True, blank=True)
     region = models.CharField(max_length=255,null=True, blank=True)
@@ -48,7 +56,7 @@ User = get_user_model()
 
 class TournamentRegistration(models.Model):
     PAYMENT_STATUS_CHOICES = [
-        ("Pending", "Pending"),
+        ("Pending", "En attente"),
         ("Paid", "Paid"),
         ("Failed", "Failed"),
     ]
@@ -58,7 +66,7 @@ class TournamentRegistration(models.Model):
     stripe_payment_intent_id = models.CharField(max_length=255, null=True, blank=True)
     amount = models.CharField(max_length=255, null=True, blank=True)
     email = models.EmailField( null=True, blank=True)
-    payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default="Pending")
+    payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default="En attente")
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
 
     class Meta:
@@ -88,8 +96,8 @@ class Pool(models.Model):
     User = get_user_model()
 class Match(models.Model):
     STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Completed', 'Completed'),
+        ('Pending', 'En attente'),
+        ('Completed', 'Complété'),
     ]
 
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='matches')
@@ -97,7 +105,7 @@ class Match(models.Model):
     player_2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='player_2_matches')
     pool = models.ForeignKey(Pool, on_delete=models.CASCADE, related_name='matches', null=True, blank=True)
     date = models.DateTimeField(null=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='En attente')
     result = models.JSONField(default=dict, blank=True)
     winner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='won_matches')
     
@@ -118,7 +126,7 @@ class Claim(models.Model):
     subject = models.CharField(max_length=255)
     details = models.TextField()
     image = models.ImageField(upload_to='Claim/image/', null=True, blank=True)
-    claim_status=models.CharField(max_length=100,default='pending')
+    claim_status=models.CharField(max_length=100,default='en attente')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -131,7 +139,9 @@ class MatchChat(models.Model):
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='chats')
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
+    is_read = models.BooleanField(default=False)  # New field to track read status
     timestamp = models.DateTimeField(auto_now_add=True)
+    
 
     def __str__(self):
         return f"Chat by {self.sender.username} in Match {self.match.id}"   
@@ -146,7 +156,7 @@ class Prize(models.Model):
     position = models.CharField(max_length=50)  # e.g., "Champion", "Runner-up", "Third Place"
     prize_value = models.CharField(max_length=50)  # e.g., "200" (as a string, or use DecimalField)
     winner = models.ForeignKey(User, on_delete=models.CASCADE)
-    trans_payment_status=models.CharField(max_length=100,default='pending')
+    trans_payment_status=models.CharField(max_length=100,default='en attente')
 
     def __str__(self):
         return f"{self.position} prize for {self.tournament.tournament_name} - Winner: {self.winner.username}"    

@@ -1,7 +1,7 @@
 import datetime
 from rest_framework import serializers
 from toornoi_user_management.models import User
-from .models import  Claim, MatchChat, Notification, Prize, Tournament,Match, TournamentRegistration,Pool
+from .models import  Claim, MatchChat, Notification, Prize, Tournament,Match, TournamentRegistration,Pool, TournamentType, category
 from django.contrib.auth import get_user_model
 
 # for admin panel 
@@ -24,6 +24,24 @@ class MyTournamentUsersSerializer(serializers.ModelSerializer):
         return pool.total_pool if pool else 0  # Default to 0 if no pool exists    
         
  
+ 
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = category
+        fields = '__all__'  # Include all fields
+
+class TournamentTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TournamentType
+        fields = '__all__'  # Include all fields
+
+class DisplayTournamentSerializer(serializers.ModelSerializer):
+    category =serializers.StringRelatedField()
+    bracket_type=serializers.StringRelatedField()
+    
+    class Meta:
+        model = Tournament
+        fields = '__all__'  # Include all tournament fields
         
 class TournamentSerializer(serializers.ModelSerializer):
     
@@ -60,6 +78,8 @@ from .models import Tournament, TournamentRegistration
 class GetTournamentSerializer(serializers.ModelSerializer):
     payment_status = serializers.SerializerMethodField()
     is_registered = serializers.SerializerMethodField()
+    category =serializers.StringRelatedField()
+    bracket_type=serializers.StringRelatedField()
 
     class Meta:
         model = Tournament
@@ -122,7 +142,7 @@ class DisplayPoolSerializer(serializers.ModelSerializer):
         Only matches with status "Completed" and a non-null winner are considered.
         """
         winners = []
-        matches = obj.matches.filter(status="Completed")
+        matches = obj.matches.filter(status="Complété")
         for match in matches:
             if match.winner:
                 winners.append(match.winner.username)
@@ -134,7 +154,7 @@ class DisplayPoolSerializer(serializers.ModelSerializer):
         For each completed match, the loser is the player who is not the winner.
         """
         losers = []
-        matches = obj.matches.filter(status="Completed")
+        matches = obj.matches.filter(status="Complété")
         for match in matches:
             if match.winner:
                 # Determine the loser: if player_1 is the winner, then player_2 lost, and vice versa.
@@ -188,6 +208,7 @@ class PoolSerializer(serializers.ModelSerializer):
 #update code  start
 # Create a nested serializer for Tournament to include the extra fields.
 class TournamentNestedSerializer(serializers.ModelSerializer):
+    bracket_type = serializers.CharField(source='bracket_type.name', read_only=True)
     class Meta:
         model = Tournament
         fields = (
@@ -215,10 +236,17 @@ class DisplayMatchSerializer(serializers.ModelSerializer):
     pool = serializers.CharField(source='pool.pool_number', read_only=True)
     winner = serializers.CharField(source='winner.username', allow_null=True)  # Display winner's username
     result = serializers.JSONField()  # Display the JSON result as is
+   
+
+
 
     class Meta:
         model = Match
         fields = '__all__'
+    
+
+
+
     
     def get_player_1_photo(self, obj):
         if hasattr(obj.player_1, 'photo') and obj.player_1.photo:
@@ -359,9 +387,9 @@ class UserMatchSerializer(serializers.ModelSerializer):
         user = request.user
         # Ensure that the user is a participant in this match.
         if user != obj.player_1 and user != obj.player_2:
-            return "Not Participating"
-        if obj.status != "Completed":
-            return "Pending"
+            return "Ne pas participer"
+        if obj.status != "Complété":
+            return "En attente"
         return "Win" if obj.winner and obj.winner == user else "Lose"
  
  
@@ -383,7 +411,15 @@ class MatchChatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MatchChat
-        fields = ['id', 'match', 'sender', 'sender_photo', 'message', 'timestamp']
+        fields = ['id', 'match', 'sender', 'sender_photo', 'message', 'is_read','timestamp']
+        
+    def validate_message(self, value):
+        """
+        Ensure message supports emojis and has a reasonable length.
+        """
+        if len(value) > 500:
+            raise serializers.ValidationError("Le message est trop long. Limite : 500 caractères.")
+        return value
 
     def get_sender_photo(self, obj):
         """
@@ -414,8 +450,8 @@ class UserTournamentCountSerializer(serializers.Serializer):
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
-        # fields = '__all__'
-        fields = ['id', 'title', 'message', 'created_at', 'is_read']        
+        fields = '__all__'
+        # fields = ['id', 'title', 'message', 'created_at', 'is_read','user']        
         
         
 #Contact Form submit Serializer     

@@ -26,7 +26,7 @@ class SuperAdminLoginView(APIView):
             # Respond with the token and a success message
             return Response({
                 "token": token.key,
-                "message": "Login successful.",
+                "message": "Connexion réussie.",
             }, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -44,7 +44,7 @@ class SuperAdminProfileView(APIView):
         print(f"User: {user}, Superuser: {user.is_superuser}")
 
         if not user.is_superuser:
-            return Response({"detail": "You are not authorized to view this profile."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Vous n'êtes pas autorisé(e) à voir ce profil."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = UserProfileSerializer(user)
         return Response(serializer.data)
@@ -60,7 +60,7 @@ class SuperAdminUpdateProfileView(APIView):
 
         # Check if the user is a superadmin
         if not user.is_superuser:
-            return Response({"detail": "You are not authorized to update this profile."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Vous n'êtes pas autorisé à mettre à jour ce profil."}, status=status.HTTP_403_FORBIDDEN)
 
         # Deserialize and validate the incoming data
         serializer = UserProfileSerializer(user, data=request.data, partial=False)
@@ -68,7 +68,7 @@ class SuperAdminUpdateProfileView(APIView):
         if serializer.is_valid():
             # Update the user profile
             serializer.save()
-            return Response({"message": "Profile updated successfully."}, status=status.HTTP_200_OK)
+            return Response({"message": "Profil mis à jour avec succès."}, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -89,7 +89,7 @@ class RegisterUserView(APIView):
             user = User.objects.filter(email=email, is_active=False).first()
             if user:
                 return Response(
-                    {"message": "User already registered but not verified. Redirecting to resend email."},
+                    {"message": "Utilisateur déjà enregistré, mais non vérifié. Redirection pour renvoyer l'e-mail"},
                     status=status.HTTP_302_FOUND
                 )
 
@@ -108,15 +108,15 @@ class RegisterUserView(APIView):
 
             # Send email
             send_mail(
-                subject="Welcome to Toornoi.com – Confirm Your Registration",
+                subject="Bienvenue sur Toornoi.com – Confirmez votre inscription",
                 message=plain_message,
-                from_email="meatitd9@gmail.com",
+                from_email="contact@toornoi.com",
                 recipient_list=[user.email],
                 html_message=html_message,  # This sends the HTML email
                 fail_silently=False,
             )
 
-            return Response({"message": "Check your email for the verification link."}, status=status.HTTP_201_CREATED)
+            return Response({"message": "Vérifiez votre courrier électronique pour le lien de vérification."}, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 # class RegisterUserView(APIView):
@@ -163,13 +163,13 @@ class VerifyEmailView(APIView):
         token = request.GET.get('token')
         
         if not token:
-            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Un jeton est requis"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get the user ID from the cache using the token
         user_id = cache.get(token)
         if not user_id:
             return Response({
-                "error": "Invalid or expired token. Please request a new verification email."
+                "error": "Jeton invalide ou expiré. Veuillez demander un nouvel e-mail de vérification."
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -182,9 +182,9 @@ class VerifyEmailView(APIView):
             # Remove the token from the cache after successful verification
             cache.delete(token)
 
-            return Response({"message": "Your account has been verified."}, status=status.HTTP_200_OK)
+            return Response({"message": "Votre compte a été vérifié."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
 
 
 # Resend Email verification 
@@ -194,7 +194,7 @@ class ResendVerificationEmailView(APIView):
         email = request.data.get('email')
         
         if not email:
-            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "L'e-mail est requis"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = User.objects.get(email=email, is_active=False)
@@ -208,16 +208,16 @@ class ResendVerificationEmailView(APIView):
             
             # Send the verification email
             send_mail(
-                'Verify Your Account - Resend',
-                f'Click the link to verify your account: {verify_link}',
-                 'chumarlatif123@gmail.com',
+                'Vérifiez votre compte - Renvoyer',
+                f'Cliquez sur le lien pour vérifier votre compte: {verify_link}',
+                 'contact@toornoi.com',
                 [user.email],
                 fail_silently=False,
             )
 
-            return Response({"message": "Verification email has been resent."}, status=status.HTTP_200_OK)
+            return Response({"message": "L'e-mail de vérification a été renvoyé."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return Response({"error": "User not found or already verified"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Utilisateur non trouvé ou déjà vérifié"}, status=status.HTTP_404_NOT_FOUND)
 
 
 
@@ -237,7 +237,7 @@ class UserLoginView(APIView):
             # Respond with the token and a success message
             return Response({
                 "token": token.key,
-                "message": "Login successful.",
+                "message": "Connexion réussie.",
             }, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -253,7 +253,7 @@ class UserProfileView(APIView):
         print(f"User: {user}, user: {user.is_verified }")
 
         if not user.is_verified:
-            return Response({"detail": "You are not authorized to view this profile."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Vous n'êtes pas autorisé à voir ce profil."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = UserProfileSerializer(user)
         return Response(serializer.data)
@@ -269,7 +269,7 @@ class UserUpdateProfileView(APIView):
 
         # Check if the user is a superadmin
         if not user.is_verified:
-            return Response({"detail": "You are not authorized to update this profile."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Vous n'êtes pas autorisé à mettre à jour ce profil."}, status=status.HTTP_403_FORBIDDEN)
 
         # Deserialize and validate the incoming data
         serializer = UserProfileSerializer(user, data=request.data, partial=False)
@@ -277,7 +277,7 @@ class UserUpdateProfileView(APIView):
         if serializer.is_valid():
             # Update the user profile
             serializer.save()
-            return Response({"message": "Profile updated successfully."}, status=status.HTTP_200_OK)
+            return Response({"message": "Profil mis à jour avec succès."}, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
@@ -299,14 +299,14 @@ class ForgotPasswordView(APIView):
             
             # Send the reset password email
             send_mail(
-                'Reset Your Password',
-                f'Click the link to reset your password: {reset_link}',
-                'chumarlatif123@gmail.com',  # Change to your sender email
+                'Réinitialisez votre mot de passe',
+                f'Cliquez sur le lien pour réinitialiser votre mot de passe: {reset_link}',
+                'contact@toornoi.com',  # Change to your sender email
                 [user.email],
                 fail_silently=False,
             )
 
-            return Response({"message": "A password reset link has been sent to your email."}, status=status.HTTP_200_OK)
+            return Response({"message": "Un lien de réinitialisation du mot de passe a été envoyé à votre adresse e-mail."}, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -316,11 +316,11 @@ class ResetPasswordView(APIView):
     def post(self, request):
         token = request.GET.get('token')
         if not token:
-            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Un jeton est requis"}, status=status.HTTP_400_BAD_REQUEST)
         
         user_id = cache.get(token)
         if not user_id:
-            return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Jeton invalide ou expiré"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = ResetPasswordSerializer(data=request.data)
         if serializer.is_valid():
@@ -329,9 +329,9 @@ class ResetPasswordView(APIView):
                 user.set_password(serializer.validated_data['new_password'])
                 user.save()
                 cache.delete(token)  # Clean up the token
-                return Response({"message": "Your password has been reset successfully."}, status=status.HTTP_200_OK)
+                return Response({"message": "Votre mot de passe a été réinitialisé avec succès."}, status=status.HTTP_200_OK)
             except User.DoesNotExist:
-                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)            
     

@@ -19,12 +19,14 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from  toornoi_main.views import AthletesViewSet, ClaimViewSet, ContactFormAPIView, MatchChatViewSet, MatchViewSet, NotificationViewSet, PoolViewSet, PrizeViewSet, PublishedTournamentViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentCountView, UserTournamentResultsView, UserTournamentsViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
+from  toornoi_main.views import AthletesViewSet, CategoryViewSet, ClaimViewSet, ContactFormAPIView, MatchChatViewSet, MatchViewSet, NotificationViewSet, PoolViewSet, PrizeViewSet, PublishedTournamentViewSet, TotalclaimViewSet, TournamentAllViewSet, TournamentTypeViewSet, TournamentsViewSet, Tournamentviewset,AthleteViewSet,RegisterAthletesShowViewSet, UserMatchesViewSet, UserTournamentCountView, UserTournamentResultsView, UserTournamentsViewSet, UserclaimViewSet, UsersMatchesViewSet,stripe_webhook, total_paid_amount, total_positions
 
 
 
 router = DefaultRouter()
 # for admin panel 
+router.register('categories', CategoryViewSet)
+router.register('tournament-types', TournamentTypeViewSet)
 #admin can manage tournaments view details   click on  button view Athletes Register list on each tournament /tournaments/tournament_id/registered_users/
 router.register('tournaments', Tournamentviewset, basename='tournament')
 
@@ -49,6 +51,7 @@ router.register('my_tournaments', UserTournamentsViewSet, basename='my_tournamen
 router.register('user/matches', UserMatchesViewSet, basename='user-matches')
 router.register('pools', PoolViewSet, basename='pool')
 
+# get http://127.0.0.1:8000/notifications -> and mark_as_read -> http://127.0.0.1:8000/notifications/7/mark_as_read/
 router.register('notifications', NotificationViewSet, basename='notifications')
 #for user  show tournament list and resgister on it 
 router.register('tournament_user', TournamentsViewSet, basename='tournament_user')
@@ -60,6 +63,7 @@ router.register('profile-matches', UsersMatchesViewSet, basename='profile-matche
 #update "claim_status": "Resolved"  and send email to user  POST Method  http://127.0.0.1:8000/claims/1/update-claim-status/
 router.register('claims', ClaimViewSet, basename='claims')
 router.register('total_claim',TotalclaimViewSet,basename='total_claim')
+router.register('user-claims', UserclaimViewSet, basename='user-claims')
 
 # update status is paid  and send email to user  POST Method http://127.0.0.1:8000/prize/1/update_payment_status/
 router.register('prize',PrizeViewSet,basename='prize')
@@ -87,6 +91,7 @@ urlpatterns = [
 # GET /matches/<match_pk>/chats/: Retrieves the conversation (i.e., all chat messages) for the specified match.
 # POST /matches/<match_pk>/chats/: Allows an authenticated user (one of the two players) to
     path('matches/<int:match_pk>/chats/', match_chat_list, name='match-chat-list'),
+    path('matches/<int:match_pk>/mark_as_read/', MatchChatViewSet.as_view({'post': 'mark_as_read'}), name='mark-as-read'),
     
     # update ,DELETE http://127.0.0.1:8000/matches/2/chats/5/
     path('matches/<int:match_pk>/chats/<int:pk>/', match_chat_detail, name='match-chat-detail'),

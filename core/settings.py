@@ -26,8 +26,11 @@ SECRET_KEY = 'django-insecure-p_9+9!4j1gs@1l43tkhet2g9dx4rdoa5*z2^!x2&*z-o4_mnpp
 DEBUG = True
 
 ALLOWED_HOSTS = ['api.toornoi.com', 'toornoi.com']
-# ALLOWED_HOSTS = []
 CORS_ALLOWED_ORIGINS = ['https://toornoi.com']
+
+
+# ALLOWED_HOSTS = []
+
 # CORS_ALLOW_ALL_ORIGINS = True
 
 
@@ -90,12 +93,16 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Toornoi_manage',
+        'NAME': 'toornoi_manage',
         'USER':'root',
         # 'PASSWORD':'',
         'PASSWORD':'Pak@123',
         'HOST':'127.0.0.1',
         'PORT':'3306',
+         'OPTIONS': {
+            'charset': 'utf8mb4',  
+            'use_unicode': True,
+        },
     }
 }
 
@@ -150,22 +157,12 @@ MEDIA_ROOT = BASE_DIR / 'media'
 import os
 # # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST = 'smtp.sendgrid.net'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER ='meatitd9@gmail.com'
-EMAIL_HOST_PASSWORD ='knhqsglmioibgdqm'
-
-
-
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'email-smtp.us-east-1.amazonaws.com'  # Change based on your AWS region
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'AKIATAVABJO7BYT7AQXL'  # Copy from AWS
-# EMAIL_HOST_PASSWORD = 'BMKp2y6DCY0ehJ3s939Vi9cBiYhWKOAZZlA1Kn1OQoie'
-# # DEFAULT_FROM_EMAIL = 'your_verified_email@example.com'  # Must be verified in SES
-
+EMAIL_HOST_USER = 'apikey'  # This must be 'apikey' (not your SendGrid username)
+EMAIL_HOST_PASSWORD = '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'  # Replace with your actual API key
+DEFAULT_FROM_EMAIL = "contact@toornoi.com"
 
 
 
@@ -183,17 +180,13 @@ REST_FRAMEWORK = {
 
 
 
-STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
+#STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
 
-STRIPE_ENDPOINT_SECRET = "whsec_mhHKaDI0oNZdYD1zjftzPHBaolYrAA9p"
+# STRIPE_ENDPOINT_SECRET = "whsec_mhHKaDI0oNZdYD1zjftzPHBaolYrAA9p"
 # STRIPE_ENDPOINT_SECRET = "whsec_c3a828789646f231d69716991c5e2a2d8dd67759aa3d39360decb62a1d2f41fa"                        
-DEFAULT_FROM_EMAIL = 'umardev82@gmail.com'
 
-# OneSignal configuration:
 
-# ONESIGNAL_APP_ID = '23b64ee4-fc2d-4b06-8fc2-13b051436765'
-                    
-# ONESIGNAL_REST_API_KEY = 'os_v2_app_eo3e5zh4fvfqnd6ccoyfcq3hmv3qm23vbw4esmeg67dd4czsav6t2m3vombpi57u2wxghmy5hbpltrpavjpe63m4lygvznnneaacwaq'
+
 
 
 APPEND_SLASH = False
