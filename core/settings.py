@@ -156,13 +156,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 import os
 # # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey'  # This must be 'apikey' (not your SendGrid username)
-EMAIL_HOST_PASSWORD = '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'  # Replace with your actual API key
-DEFAULT_FROM_EMAIL = "contact@toornoi.com"
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.sendgrid.net'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'apikey'  # This must be 'apikey' (not your SendGrid username)
+# EMAIL_HOST_PASSWORD = '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'  # Replace with your actual API key
+# DEFAULT_FROM_EMAIL = "contact@toornoi.com"
 
 
 
