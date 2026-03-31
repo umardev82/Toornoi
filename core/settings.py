@@ -25,8 +25,8 @@ SECRET_KEY = 'django-insecure-p_9+9!4j1gs@1l43tkhet2g9dx4rdoa5*z2^!x2&*z-o4_mnpp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['api.toornoi.com', 'toornoi.com']
-CORS_ALLOWED_ORIGINS = ['https://toornoi.com']
+ALLOWED_HOSTS = ['enter domain']
+CORS_ALLOWED_ORIGINS = ['enter url ']
 
 
 # ALLOWED_HOSTS = []
@@ -161,8 +161,8 @@ import os
 # EMAIL_PORT = 587
 # EMAIL_USE_TLS = True
 # EMAIL_HOST_USER = 'apikey'  # This must be 'apikey' (not your SendGrid username)
-# EMAIL_HOST_PASSWORD = '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'  # Replace with your actual API key
-# DEFAULT_FROM_EMAIL = "contact@toornoi.com"
+# EMAIL_HOST_PASSWORD = ''  # Replace with your actual API key
+# DEFAULT_FROM_EMAIL = ""
 
 
 
@@ -180,10 +180,10 @@ REST_FRAMEWORK = {
 
 
 
-#STRIPE_SECRET_KEY = "sk_test_51I6yXKB5JXE1z3xCGF0xoPjHXiAiJEVHE054MDEjPrkzvEF8LsnL23ulcTFVzTFwf5heMBeOVe816QkOm6Z1MwWO007OW1geqw"
+STRIPE_SECRET_KEY = ""
 
-# STRIPE_ENDPOINT_SECRET = "whsec_mhHKaDI0oNZdYD1zjftzPHBaolYrAA9p"
-# STRIPE_ENDPOINT_SECRET = "whsec_c3a828789646f231d69716991c5e2a2d8dd67759aa3d39360decb62a1d2f41fa"                        
+ STRIPE_ENDPOINT_SECRET = ""
+                       
 
 
 
